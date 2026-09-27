@@ -1,4 +1,6 @@
-# GoreeCloud Bookmarks — Feature Roadmap
+# GoreeCloud Bookmarks — Planned Features
+
+> **Authority:** Repository-native planned-feature record. The former Drive roadmap is retired after verified migration.
 
 ## Authority and status
 
