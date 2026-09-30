@@ -7,7 +7,7 @@ component:
   type: application
   id: goreecloud-bookmarks
   product_name: GoreeCloud Bookmarks
-  repository: GoreeCloud/goreecloud-bookmarks
+  repository: GoreeCloud/bookmarks
 
 lifecycle: development
 version: "0.1.0"
