@@ -1,0 +1,109 @@
+import { prisma } from "@linkwarden/prisma";
+
+const MAX_LINKS_PER_USER = Number(process.env.MAX_LINKS_PER_USER) || 30000;
+const stripeEnabled = process.env.STRIPE_SECRET_KEY;
+const TRIAL_PERIOD_DAYS = process.env.NEXT_PUBLIC_TRIAL_PERIOD_DAYS || 14;
+const REQUIRE_CC = process.env.NEXT_PUBLIC_REQUIRE_CC === "true";
+
+export const hasPassedLimit = async (
+  userId: number,
+  numberOfImports: number
+) => {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      parentSubscriptionId: true,
+      subscriptions: { select: { id: true, quantity: true, provider: true } },
+      createdAt: true,
+    },
+  });
+
+  if (!stripeEnabled && user?.subscriptions?.provider !== "STRIPE") {
+    const totalLinks = await prisma.link.count({
+      where: {
+        createdById: userId,
+      },
+    });
+
+    return MAX_LINKS_PER_USER - (numberOfImports + totalLinks) < 0;
+  }
+
+  if (!user) {
+    return true;
+  }
+
+  const trialEndTime =
+    new Date(user.createdAt).getTime() +
+    (1 + Number(TRIAL_PERIOD_DAYS)) * 86400000; // Add 1 to account for the current day
+
+  const daysLeft = Math.floor((trialEndTime - Date.now()) / 86400000);
+
+  if (!REQUIRE_CC && daysLeft > 0) {
+    const totalLinks = await prisma.link.count({
+      where: {
+        createdById: userId,
+      },
+    });
+
+    return MAX_LINKS_PER_USER - (numberOfImports + totalLinks) < 0;
+  }
+
+  const subscriptionId = user?.parentSubscriptionId ?? user?.subscriptions?.id;
+  let quantity = user?.subscriptions?.quantity;
+
+  if (!quantity) {
+    quantity = (
+      await prisma.subscription.findUnique({
+        where: { id: subscriptionId },
+        select: { quantity: true },
+      })
+    )?.quantity;
+  }
+
+  if (!subscriptionId || !quantity) return true;
+
+  if (user.parentSubscriptionId) {
+    const childCount = await prisma.user.count({
+      where: { parentSubscriptionId: subscriptionId },
+    });
+
+    if (!childCount || childCount + 1 > quantity) {
+      return true;
+    }
+  }
+
+  if (
+    user.parentSubscriptionId ||
+    (user.subscriptions && user.subscriptions?.quantity > 1)
+  ) {
+    // Calculate the total allowed links for the organization
+    const totalCapacity = quantity * MAX_LINKS_PER_USER;
+
+    const totalLinks = await prisma.link.count({
+      where: {
+        createdBy: {
+          OR: [
+            {
+              parentSubscriptionId: subscriptionId || undefined,
+            },
+            {
+              subscriptions: {
+                id: subscriptionId || undefined,
+              },
+            },
+          ],
+        },
+      },
+    });
+
+    return totalCapacity - (numberOfImports + totalLinks) < 0;
+  } else {
+    const totalLinks = await prisma.link.count({
+      where: {
+        createdById: userId,
+      },
+    });
+
+    return MAX_LINKS_PER_USER - (numberOfImports + totalLinks) < 0;
+  }
+};

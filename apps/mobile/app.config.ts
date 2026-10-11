@@ -1,0 +1,149 @@
+import { ExpoConfig } from "expo/config";
+
+const config: ExpoConfig = {
+  name: "Linkwarden",
+  slug: "linkwarden",
+  version: "1.4.3",
+  orientation: "portrait",
+  icon: "./assets/images/icon.png",
+  scheme: "linkwarden",
+  userInterfaceStyle: "automatic",
+  ios: {
+    supportsTablet: true,
+    bundleIdentifier: "app.linkwarden",
+    entitlements: {
+      "com.apple.security.application-groups": ["group.app.linkwarden"],
+    },
+    infoPlist: {
+      ITSAppUsesNonExemptEncryption: false,
+      NSAppTransportSecurity: {
+        NSAllowsArbitraryLoads: true,
+      },
+    },
+  },
+  android: {
+    adaptiveIcon: {
+      foregroundImage: "./assets/images/maskable_logo.png",
+      backgroundColor: "#ffffff",
+    },
+    package: "app.linkwarden",
+  },
+  web: {
+    bundler: "metro",
+    output: "static",
+    favicon: "./assets/images/favicon.png",
+  },
+  plugins: [
+    "expo-router",
+    "expo-iap",
+    [
+      "expo-splash-screen",
+      {
+        image: "./assets/images/splash-icon.png",
+        imageWidth: 200,
+        resizeMode: "contain",
+        backgroundColor: "#FFFFFF",
+        dark: {
+          image: "./assets/images/splash-icon.png",
+          resizeMode: "contain",
+          backgroundColor: "#171717",
+        },
+      },
+    ],
+    [
+      "@react-native-google-signin/google-signin",
+      {
+        iosUrlScheme:
+          process.env.EXPO_PUBLIC_GOOGLE_IOS_URL_SCHEME ??
+          "com.googleusercontent.apps.1097450926817-o94t2bb30jt2me2u17ni2cc2qogd2v34",
+      },
+    ],
+    "expo-secure-store",
+    [
+      "expo-image-picker",
+      {
+        photosPermission:
+          "Allow $(PRODUCT_NAME) to access your photos to upload custom link banners.",
+        cameraPermission: false,
+        microphonePermission: false,
+      },
+    ],
+    [
+      "expo-share-intent",
+      {
+        iosAppGroupIdentifier: "group.app.linkwarden",
+        iosActivationRules:
+          'SUBQUERY (extensionItems, $extensionItem, SUBQUERY ($extensionItem.attachments, $attachment, (ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO "public.url" OR ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO "public.text" OR ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO "public.plain-text")).@count > 0).@count > 0',
+        androidIntentFilters: ["text/*"],
+      },
+    ],
+    [
+      "expo-build-properties",
+      {
+        android: {
+          enableProguardInReleaseBuilds: true,
+          extraProguardRules: "-keep public class com.horcrux.svg.** {*;}",
+          allowBackup: false,
+          compileSdkVersion: 36,
+          targetSdkVersion: 36,
+          buildToolsVersion: "36.0.0",
+          usesCleartextTraffic: true,
+        },
+        ios: {
+          extraPods: [
+            { name: "GoogleUtilities", modular_headers: true },
+            { name: "RecaptchaInterop", modular_headers: true },
+          ],
+        },
+      },
+    ],
+    [
+      "react-native-edge-to-edge",
+      {
+        android: {
+          parentTheme: "Default",
+          enforceNavigationBarContrast: false,
+        },
+      },
+    ],
+    "./plugins/with-daynight-transparent-nav",
+    "./plugins/with-network-security-config",
+    "./plugins/with-gradle-memory",
+    "expo-font",
+    "expo-web-browser",
+    "expo-apple-authentication",
+    [
+      "@sentry/react-native/expo",
+      {
+        url: "https://sentry.io/",
+        project: "react-native",
+        organization: "linkwarden",
+      },
+    ],
+    [
+      "expo-navigation-bar",
+      {
+        barStyle: "dark-content",
+      },
+    ],
+  ],
+  experiments: {
+    typedRoutes: true,
+  },
+  androidStatusBar: {
+    backgroundColor: "#ffffff",
+    barStyle: "dark-content",
+    translucent: false,
+  },
+  extra: {
+    router: {
+      origin: false,
+    },
+    eas: {
+      projectId: "34f82639-7a25-4ebe-81c8-2db521b612cf",
+    },
+  },
+  owner: "linkwarden",
+};
+
+export default config;

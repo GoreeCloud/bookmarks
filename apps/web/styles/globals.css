@@ -1,0 +1,227 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --default: 82.76% 0.101277 230.317893;
+  --red: 69.73% 0.168 22.43;
+  --rose: 75% 0.2 340;
+  --yellow: 90% 0.1 90;
+  --green: 88.58% 0.2465 140;
+  --orange: 80% 0.18 60;
+  --zinc: 88.45% 0.05 220;
+}
+
+[data-theme="light"] {
+  color-scheme: light;
+  --default: 50% 0.1193 242.75;
+  --red: 49.7% 0.2026 22.43;
+  --rose: 55% 0.25 340;
+  --yellow: 69.58% 0.2 90;
+  --green: 60% 0.2 140;
+  --orange: 70% 0.22 60;
+  --zinc: 50% 0.07 220;
+}
+
+/* Hide scrollbar */
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.hide-color-picker {
+  opacity: 0;
+  display: block;
+  width: 32px;
+  height: 32px;
+  border: none;
+}
+
+.hyphens {
+  hyphens: auto;
+}
+
+.rotate {
+  transition: transform 0.1s ease;
+  transform: rotate(-90deg);
+}
+
+.rotate-reverse {
+  transition: transform 0.1s ease;
+  transform: rotate(0deg);
+}
+
+.fade-in {
+  animation: fade-in-animation 200ms;
+}
+
+@keyframes fade-in-animation {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+.slide-up {
+  animation: slide-up-animation 200ms;
+}
+
+.slide-down {
+  animation: slide-down-animation 70ms;
+}
+
+@keyframes slide-down-animation {
+  0% {
+    transform: translateY(-15%);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slide-up-animation {
+  0% {
+    transform: translateY(5%);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.slide-right {
+  animation: slide-right-animation 200ms;
+}
+
+@keyframes slide-right-animation {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+
+.slide-right-with-fade {
+  animation: slide-right-animation 150ms;
+}
+
+@keyframes slide-right-animation {
+  0% {
+    transform: translateX(-50%);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.spin {
+  animation: spin 2s linear infinite;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* For react-colorful */
+.color-picker .react-colorful {
+  height: 7rem;
+  width: 7rem;
+}
+.color-picker .react-colorful__hue {
+  height: 1rem;
+}
+.color-picker .react-colorful__pointer {
+  width: 1rem;
+  height: 1rem;
+  border-width: 1px;
+}
+
+.react-select__indicator-separator {
+  display: none;
+}
+
+.react-select__control--is-focused .react-select__dropdown-indicator,
+.react-select__control .react-select__dropdown-indicator,
+.react-select__control .react-select__dropdown-indicator:hover,
+.react-select__control .react-select__dropdown-indicator:focus,
+.react-select__control--is-focused .react-select__dropdown-indicator:hover,
+.react-select__control--is-focused .react-select__dropdown-indicator:focus {
+  color: oklch(var(--n));
+}
+
+/* Theme */
+
+@layer components {
+  .react-select-container .react-select__control {
+    @apply bg-base-200 hover:border-neutral-content;
+  }
+
+  .react-select-container .react-select__control--is-focused {
+    @apply border-primary hover:border-primary;
+  }
+
+  .react-select-container .react-select__menu {
+    @apply bg-base-100 border-neutral-content border rounded-md;
+  }
+
+  .react-select-container .react-select__input-container,
+  .react-select-container .react-select__single-value {
+    @apply text-base-content;
+  }
+
+  .menu li > *:not(ul):not(.menu-title):not(details),
+  .menu li > details > summary {
+    @apply hover:!bg-base-content/10 hover:!text-inherit active:!bg-base-content/10 active:!text-base-content;
+  }
+
+  .alert {
+    @apply rounded-md;
+  }
+
+  .alert-warning {
+    @apply bg-transparent border-yellow-400/50 text-yellow-400;
+  }
+  .alert-info {
+    @apply bg-transparent border-blue-400/50 text-blue-400;
+  }
+  .alert-note {
+    @apply bg-transparent border-base-content/50 text-base-content;
+  }
+}
+
+.line-break * {
+  overflow-y: hidden;
+}
+
+.custom-file-input::file-selector-button {
+  cursor: pointer;
+}
+
+/* Reader view theme variables (base styles are in @linkwarden/lib/readerViewStyles) */
+[data-theme="dark"] {
+  --rv-code-bg: rgb(49, 49, 49);
+  --rv-mark-bg: oklch(var(--p) / 0.5);
+  --rv-mark-color: oklch(var(--bc));
+}
+[data-theme="light"] {
+  --rv-code-bg: rgb(230, 230, 230);
+  --rv-mark-bg: oklch(var(--p) / 0.5);
+  --rv-mark-color: oklch(var(--bc));
+}

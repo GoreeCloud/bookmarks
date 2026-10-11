@@ -1,0 +1,25 @@
+{
+  "name": "@linkwarden/prisma",
+  "version": "0.0.0",
+  "private": true,
+  "main": "index.ts",
+  "dependencies": {
+    "@prisma/client": "^6.10.1",
+    "prisma": "^6.10.1"
+  },
+  "scripts": {
+    "generate": "prisma generate",
+    "deploy": "prisma migrate deploy",
+    "dev": "prisma migrate dev",
+    "studio": "prisma studio"
+  },
+  "devDependencies": {
+    "@types/node": "^22.14.0",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.3"
+  },
+  "prisma": {
+    "seed": "node ./seed.js"
+  },
+  "types": "index.d.ts"
+}

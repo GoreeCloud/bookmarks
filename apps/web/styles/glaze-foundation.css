@@ -1,0 +1,74 @@
+/* GoreeCloud Bookmarks — early Glaze-directed presentation adapter.
+   Not a substitute for Glaze V1.7.0 runtime integration or consumer acceptance. */
+:root {
+  --gcb-radius: 0.875rem;
+  --gcb-radius-small: 0.625rem;
+  --gcb-ring: #2563eb;
+  --gcb-ease: cubic-bezier(0.2, 0.75, 0.2, 1);
+  --gcb-duration: 160ms;
+}
+[data-theme="light"] {
+  --gcb-surface: #f7f9fc;
+  --gcb-edge: #d9e2ef;
+  --gcb-text: #18253a;
+  --gcb-shadow: 0 10px 28px rgba(26, 47, 78, .065);
+}
+[data-theme="dark"] {
+  --gcb-surface: #152032;
+  --gcb-edge: #34465e;
+  --gcb-text: #f1f5fa;
+  --gcb-shadow: 0 10px 28px rgba(0, 0, 0, .22);
+}
+html {
+  scroll-behavior: smooth;
+}
+body {
+  font-feature-settings: "kern", "liga";
+  text-rendering: optimizeLegibility;
+}
+#sidebar {
+  background: var(--gcb-surface);
+  border-right-color: var(--gcb-edge);
+}
+.gcb-product-link {
+  display: flex;
+  align-items: center;
+  min-height: 3rem;
+  padding: .5rem;
+  gap: .7rem;
+  border-radius: var(--gcb-radius-small);
+  color: var(--gcb-text);
+  transition: background var(--gcb-duration) var(--gcb-ease);
+}
+.gcb-product-link:hover {
+  background: color-mix(in srgb, var(--gcb-ring) 8%, transparent);
+}
+.gcb-product-mark {
+  width: 2rem;
+  height: 2rem;
+  flex-shrink: 0;
+  border-radius: .6rem;
+}
+.gcb-product-name {
+  font-weight: 720;
+  line-height: 1.15;
+  letter-spacing: -.025em;
+}
+.gcb-product-subtitle {
+  font-size: .72rem;
+  opacity: .65;
+  line-height: 1.2;
+  margin-top: .15rem;
+}
+:is(a, button, input, select, textarea, [role="button"]):focus-visible {
+  outline: 3px solid var(--gcb-ring);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}

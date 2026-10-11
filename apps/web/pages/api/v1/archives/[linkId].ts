@@ -1,0 +1,326 @@
+import type { NextApiRequest, NextApiResponse } from "next";
+import formidable from "formidable";
+import fs from "fs";
+import { readFile, createFile, createFolder } from "@linkwarden/filesystem";
+import { generatePreview } from "@linkwarden/lib/generatePreview";
+import verifyToken from "@/lib/api/verifyToken";
+import verifyUser from "@/lib/api/verifyUser";
+import getPermission from "@/lib/api/getPermission";
+import resolveAccessibleArchive from "@/lib/api/archives/resolveAccessibleArchive";
+import { prisma } from "@linkwarden/prisma";
+import { UsersAndCollections } from "@linkwarden/prisma/client";
+import { UploadFileSchema } from "@linkwarden/lib/schemaValidation";
+import isDemoMode from "@/lib/api/isDemoMode";
+import getSuffixFromFormat from "@/lib/shared/getSuffixFromFormat";
+import { ArchivedFormat } from "@linkwarden/types/global";
+
+export const config = {
+  api: {
+    bodyParser: false,
+    responseLimit: "100mb",
+  },
+};
+
+/** ------------------ */
+/** Helper Functions   */
+/** ------------------ */
+
+// Check whether user can create in the given collection
+function userHasCreatePermission(
+  collectionPermissions: any,
+  userId: number
+): boolean {
+  if (!collectionPermissions) return false;
+  const memberHasAccess = collectionPermissions.members.some(
+    (e: UsersAndCollections) => e.userId === userId && e.canCreate
+  );
+  return collectionPermissions.ownerId === userId || Boolean(memberHasAccess);
+}
+
+// Ensure user does not exceed maximum link limit
+async function verifyLinkLimit(userId: number) {
+  const MAX_LINKS_PER_USER = Number(process.env.MAX_LINKS_PER_USER || 30000);
+  const userLinkCount = await prisma.link.count({
+    where: {
+      collection: {
+        ownerId: userId,
+      },
+    },
+  });
+  if (userLinkCount > MAX_LINKS_PER_USER) {
+    throw new Error(
+      `Each collection owner can only have a maximum of ${MAX_LINKS_PER_USER} Links.`
+    );
+  }
+}
+
+// Common validation for file size and type
+function validateFile(
+  file: formidable.File,
+  maxMB: number,
+  allowedTypes: string[]
+) {
+  if (!file || !allowedTypes.includes(file.mimetype || "")) {
+    throw new Error(
+      `Sorry, we couldn't process your file. Please ensure it's in [${allowedTypes.join(
+        ", "
+      )}] format and doesn't exceed ${maxMB}MB.`
+    );
+  }
+
+  const fileBuffer = fs.readFileSync(file.filepath);
+  if (Buffer.byteLength(fileBuffer as any) > 1024 * 1024 * maxMB) {
+    throw new Error(
+      `Sorry, we couldn't process your file. Please ensure it doesn't exceed ${maxMB}MB.`
+    );
+  }
+
+  return fileBuffer;
+}
+
+/** ------------------ */
+/** Route Handlers     */
+/** ------------------ */
+
+async function handleGet(req: NextApiRequest, res: NextApiResponse) {
+  const linkId = Number(req.query.linkId);
+  const format = Number(req.query.format);
+  const isPreview = Boolean(req.query.preview);
+  const hasBearerAuthorization =
+    typeof req.headers.authorization === "string" &&
+    req.headers.authorization.trim().toLowerCase().startsWith("bearer ");
+
+  if (
+    format === ArchivedFormat.monolith &&
+    process.env.NEXT_PUBLIC_USER_CONTENT_DOMAIN &&
+    !hasBearerAuthorization
+  ) {
+    return res.status(403).json({
+      response:
+        "Monolith archive access must use the user content domain when it is configured.",
+    });
+  }
+
+  // Verify token => If present, get user ID
+  const token = await verifyToken({ req });
+  const userId = typeof token === "string" ? undefined : token?.id;
+
+  const resolvedArchive = await resolveAccessibleArchive({
+    linkId,
+    format,
+    isPreview,
+    userId,
+  });
+
+  if (resolvedArchive.status !== 200) {
+    return res
+      .status(resolvedArchive.status)
+      .json({ response: resolvedArchive.response });
+  }
+
+  const { filePath } = resolvedArchive.response;
+  const { file, contentType, status } = await readFile(filePath);
+  res
+    .setHeader("Content-Type", contentType)
+    .setHeader("Cache-Control", "private, max-age=31536000, immutable")
+    .setHeader("X-Content-Type-Options", "nosniff")
+    .status(status as number);
+  if (contentType?.startsWith("text/html")) {
+    res.setHeader("Content-Security-Policy", "sandbox");
+  }
+  return res.send(file);
+}
+
+async function handlePost(req: NextApiRequest, res: NextApiResponse) {
+  if (isDemoMode()) {
+    return res.status(400).json({
+      response:
+        "This action is disabled because this is a read-only demo of Linkwarden.",
+    });
+  }
+
+  const linkId = Number(req.query.linkId);
+  const format = Number(req.query.format);
+  const suffix = getSuffixFromFormat(format);
+  const isPreview = Boolean(req.query.preview);
+
+  if (!linkId || !suffix) {
+    return res.status(401).json({ response: "Invalid parameters." });
+  }
+
+  if (format === ArchivedFormat.readability) {
+    return res
+      .status(400)
+      .json({ response: "This format cannot be uploaded." });
+  }
+
+  // Verify user and collection permissions
+  const user = await verifyUser({ req, res });
+  if (!user) return; // verifyUser already handles the response on failure
+
+  const collectionPermissions = await getPermission({
+    userId: user.id,
+    linkId,
+  });
+  if (
+    !userHasCreatePermission(collectionPermissions, user.id) ||
+    !collectionPermissions
+  ) {
+    return res.status(400).json({ response: "Collection is not accessible." });
+  }
+
+  const link = await prisma.link.findUnique({
+    where: {
+      id: linkId,
+    },
+  });
+
+  if (!link) {
+    return res.status(400).json({ response: "Link not found." });
+  }
+
+  // Ensure if the png already exists, the user is not trying to upload a jpeg (and vice versa)
+  if (
+    ((link.image?.endsWith("jpeg") && format === ArchivedFormat.png) ||
+      (link.image?.endsWith("png") && format === ArchivedFormat.jpeg)) &&
+    !isPreview
+  ) {
+    return res
+      .status(400)
+      .json({ response: "PNG or JPEG file already exists." });
+  }
+
+  try {
+    await verifyLinkLimit(user.id);
+  } catch (err: any) {
+    return res.status(400).json({ response: err.message });
+  }
+
+  const NEXT_PUBLIC_MAX_FILE_BUFFER = Number(
+    process.env.NEXT_PUBLIC_MAX_FILE_BUFFER || 10
+  );
+
+  const form = formidable({
+    maxFields: 1,
+    maxFiles: 1,
+    maxFileSize: NEXT_PUBLIC_MAX_FILE_BUFFER * 1024 * 1024,
+  });
+
+  form.parse(req, async (err, fields, files) => {
+    try {
+      if (err || !files.file || !files.file[0]) {
+        throw new Error(
+          `Sorry, we couldn't process your file. Please ensure it doesn't exceed ${NEXT_PUBLIC_MAX_FILE_BUFFER}MB.`
+        );
+      }
+
+      // Validate input against Zod schema
+      const dataValidation = UploadFileSchema.safeParse({
+        id: linkId,
+        format,
+        file: files.file,
+      });
+      if (!dataValidation.success) {
+        const issue = dataValidation.error.issues[0];
+        throw new Error(`Error: ${issue.message} [${issue.path.join(", ")}]`);
+      }
+
+      // Check file type and size
+      const allowedMIMETypesByFormat: Record<number, string[]> = {
+        [ArchivedFormat.png]: ["image/png"],
+        [ArchivedFormat.jpeg]: ["image/jpg", "image/jpeg"],
+        [ArchivedFormat.pdf]: ["application/pdf"],
+        [ArchivedFormat.monolith]: ["text/html"],
+      };
+
+      const allowedMIMETypes = isPreview
+        ? ["image/png", "image/jpg", "image/jpeg"]
+        : allowedMIMETypesByFormat[format] ?? [];
+
+      const fileBuffer = validateFile(
+        files.file[0],
+        NEXT_PUBLIC_MAX_FILE_BUFFER,
+        allowedMIMETypes
+      );
+
+      // Confirm the link still exists
+      const linkStillExists = await prisma.link.findUnique({
+        where: { id: linkId },
+      });
+      if (!linkStillExists) {
+        throw new Error("Link not found.");
+      }
+
+      // Generate a preview if it's an image
+      const { mimetype } = files.file[0];
+      const isPDF = mimetype?.includes("pdf");
+      const isImage = mimetype?.includes("image");
+      const isHTML = mimetype === "text/html";
+
+      if (isImage) {
+        const collectionId = collectionPermissions.id;
+        createFolder({ filePath: `archives/preview/${collectionId}` });
+        await generatePreview(fileBuffer, collectionId, linkId);
+      }
+
+      if (!isPreview) {
+        // Store the file
+        await createFile({
+          filePath: `archives/${collectionPermissions.id}/${linkId + suffix}`,
+          data: fileBuffer,
+        });
+      }
+
+      // Update link in DB
+      const updateLink = await prisma.link.update({
+        where: { id: linkId },
+        data: {
+          preview: isPDF ? "unavailable" : undefined,
+          image:
+            isImage && !isPreview
+              ? `archives/${collectionPermissions.id}/${linkId + suffix}`
+              : undefined,
+          pdf: isPDF
+            ? `archives/${collectionPermissions.id}/${linkId + suffix}`
+            : undefined,
+          monolith:
+            isHTML && !isPreview
+              ? `archives/${collectionPermissions.id}/${linkId + suffix}`
+              : undefined,
+          clientSide: true,
+          updatedAt: new Date().toISOString(),
+        },
+      });
+
+      // Clean up temporary file
+      fs.unlinkSync(files.file[0].filepath);
+
+      return res.status(200).json({ response: updateLink });
+    } catch (error: any) {
+      return res.status(400).json({ response: error.message });
+    }
+  });
+}
+
+/** ------------------ */
+/** Main API Handler   */
+/** ------------------ */
+
+export default async function Index(req: NextApiRequest, res: NextApiResponse) {
+  const method = req.method;
+
+  try {
+    switch (method) {
+      case "GET":
+        await handleGet(req, res);
+        break;
+      case "POST":
+        await handlePost(req, res);
+        break;
+      default:
+        return res.status(405).json({ response: "Method not allowed" });
+    }
+  } catch (error: any) {
+    return res.status(400).json({ response: error.message });
+  }
+}
