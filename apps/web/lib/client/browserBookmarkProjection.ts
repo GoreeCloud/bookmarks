@@ -69,3 +69,38 @@ export function projectAuthorizedLinkForBrowser(
     tags,
   };
 }
+
+export type BrowserBookmarkReadPage = {
+  links: BrowserBookmarkProjection[];
+  nextAfter: number | null;
+};
+
+// Projection after an authenticated query has already scoped rows to the
+// caller's permitted collections. Never treat a client-supplied collection
+// set as authorization; this helper intentionally performs no I/O.
+export function projectAuthorizedBrowserPage(
+  fetched: ReadonlyArray<AuthorizedBrowserLink>,
+  accessibleCollectionIds: ReadonlySet<number>,
+  after: number,
+  limit: number
+): BrowserBookmarkReadPage | null {
+  if (!Number.isSafeInteger(after) || after < 0 ||
+      !Number.isSafeInteger(limit) || limit < 1 || limit > 100 ||
+      fetched.length > limit + 1) return null;
+  let previousId = after;
+  for (const link of fetched) {
+    if (!Number.isSafeInteger(link.id) || link.id <= previousId ||
+        !accessibleCollectionIds.has(link.collectionId)) return null;
+    previousId = link.id;
+  }
+  const links: BrowserBookmarkProjection[] = [];
+  for (const link of fetched.slice(0, limit)) {
+    const projected = projectAuthorizedLinkForBrowser(link, accessibleCollectionIds);
+    if (!projected) return null;
+    links.push(projected);
+  }
+  return {
+    links,
+    nextAfter: fetched.length > limit ? fetched[limit - 1].id : null,
+  };
+}
