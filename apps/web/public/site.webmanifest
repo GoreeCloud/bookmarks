@@ -1,0 +1,27 @@
+{
+  "id": "/dashboard",
+  "name": "GoreeCloud Bookmarks",
+  "short_name": "Bookmarks",
+  "icons": [
+    {
+      "src": "/goreecloud-bookmarks-mark.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "share_target": {
+    "action": "/api/v1/links/",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "url": "link"
+    }
+  },
+  "theme_color": "#11233b",
+  "background_color": "#11233b",
+  "display": "standalone",
+  "orientation": "portrait",
+  "start_url": "/dashboard",
+  "description": "Private knowledge capture, preservation and retrieval"
+}

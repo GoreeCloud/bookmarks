@@ -1,0 +1,242 @@
+import { prisma } from "@linkwarden/prisma";
+import { LinkRequestQuery, Order, Sort } from "@linkwarden/types/global";
+import { meiliClient } from "@linkwarden/lib/meilisearchClient";
+import {
+  buildMeiliFilters,
+  buildMeiliQuery,
+  parseSearchTokens,
+} from "../../searchQueryBuilder";
+import getAccessibleCollectionIds from "@/lib/api/getAccessibleCollectionIds";
+
+interface SearchLinksParams {
+  query: LinkRequestQuery;
+  userId?: number;
+  publicOnly?: boolean;
+}
+
+export default async function searchLinks({
+  query,
+  userId,
+  publicOnly,
+}: SearchLinksParams) {
+  const POSTGRES_IS_ENABLED =
+    process.env.DATABASE_URL?.startsWith("postgresql");
+
+  const paginationTakeCount = Number(process.env.PAGINATION_TAKE_COUNT) || 50;
+
+  const accessibleCollectionIdsPromise = userId
+    ? getAccessibleCollectionIds(userId)
+    : null;
+  accessibleCollectionIdsPromise?.catch(() => {});
+
+  const resolveAccessCondition = async () => {
+    if (!accessibleCollectionIdsPromise) return [];
+    const { accessibleCollectionIds } = await accessibleCollectionIdsPromise;
+    return [{ collectionId: { in: accessibleCollectionIds } }];
+  };
+
+  let order: Order = { id: "desc" };
+  if (query.sort === Sort.DateNewestFirst) order = { id: "desc" };
+  else if (query.sort === Sort.DateOldestFirst) order = { id: "asc" };
+  else if (query.sort === Sort.NameAZ) order = { name: "asc" };
+  else if (query.sort === Sort.NameZA) order = { name: "desc" };
+
+  const tagCondition = [];
+  if (query.tagId) {
+    tagCondition.push({
+      tags: {
+        some: { id: query.tagId },
+      },
+    });
+  }
+
+  const collectionCondition = [];
+  if (query.collectionId || publicOnly) {
+    collectionCondition.push({
+      collection: {
+        id: query.collectionId,
+        ...(publicOnly ? { isPublic: true } : {}),
+      },
+    });
+  }
+
+  const pinnedCondition =
+    query.pinnedOnly && userId ? { pinnedBy: { some: { id: userId } } } : {};
+
+  if (meiliClient && query.searchQueryString) {
+    const tokens = parseSearchTokens(query.searchQueryString);
+    const meiliQuery = buildMeiliQuery(tokens);
+
+    const meiliFilters = buildMeiliFilters({
+      tokens,
+      userId,
+      publicOnly,
+    });
+
+    const limit = paginationTakeCount;
+    const offset = query.cursor || 0;
+
+    const meiliResp = await meiliClient.index("links").search(meiliQuery, {
+      filter: meiliFilters,
+      attributesToRetrieve: ["id"],
+      limit,
+      offset,
+      sort:
+        query.sort === Sort.DateNewestFirst
+          ? ["id:desc"]
+          : query.sort === Sort.DateOldestFirst
+            ? ["id:asc"]
+            : query.sort === Sort.NameAZ
+              ? ["name:asc"]
+              : query.sort === Sort.NameZA
+                ? ["name:desc"]
+                : ["id:desc"],
+    });
+
+    if (meiliResp.hits.length === 0) {
+      return {
+        data: [],
+        statusCode: 200,
+        success: true,
+        message: "Nothing found.",
+      };
+    }
+
+    const meiliIds = meiliResp.hits.map((h: any) => h.id);
+
+    const accessCondition = await resolveAccessCondition();
+
+    const links = await prisma.link.findMany({
+      where: {
+        id: { in: meiliIds },
+        AND: [
+          ...accessCondition,
+          ...collectionCondition,
+          {
+            OR: [
+              ...tagCondition,
+              {
+                ...pinnedCondition,
+              },
+            ],
+          },
+        ],
+      },
+      omit: {
+        textContent: true,
+      },
+      include: {
+        tags: true,
+        collection: true,
+        pinnedBy: userId
+          ? {
+              where: { id: userId },
+              select: { id: true },
+            }
+          : undefined,
+      },
+      orderBy: order,
+    });
+
+    const nextCursor = meiliResp.hits.length === limit ? offset + limit : null;
+
+    return {
+      data: {
+        links,
+        nextCursor,
+      },
+      statusCode: 200,
+      success: true,
+      message: "Success",
+    };
+  }
+
+  // Fallback: No Meilisearch
+  const searchConditions = [];
+
+  if (query.searchQueryString) {
+    searchConditions.push({
+      name: {
+        contains: query.searchQueryString,
+        mode: POSTGRES_IS_ENABLED ? "insensitive" : undefined,
+      },
+    });
+
+    searchConditions.push({
+      url: {
+        contains: query.searchQueryString,
+        mode: POSTGRES_IS_ENABLED ? "insensitive" : undefined,
+      },
+    });
+
+    searchConditions.push({
+      description: {
+        contains: query.searchQueryString,
+        mode: POSTGRES_IS_ENABLED ? "insensitive" : undefined,
+      },
+    });
+
+    searchConditions.push({
+      tags: {
+        some: {
+          name: {
+            contains: query.searchQueryString,
+            mode: POSTGRES_IS_ENABLED ? "insensitive" : undefined,
+          },
+        },
+      },
+    });
+  }
+
+  const accessCondition = await resolveAccessCondition();
+
+  const links = await prisma.link.findMany({
+    take: paginationTakeCount,
+    skip: query.cursor ? 1 : undefined,
+    cursor: query.cursor ? { id: query.cursor } : undefined,
+    where: {
+      AND: [
+        ...accessCondition,
+        ...collectionCondition,
+        {
+          OR: [
+            ...tagCondition,
+            {
+              [query.searchQueryString ? "OR" : "AND"]: [
+                pinnedCondition,
+                ...searchConditions,
+              ],
+            },
+          ],
+        },
+      ],
+    },
+    omit: {
+      textContent: true,
+    },
+    include: {
+      tags: true,
+      collection: true,
+      pinnedBy: userId
+        ? {
+            where: { id: userId },
+            select: { id: true },
+          }
+        : undefined,
+    },
+    orderBy: order,
+  });
+
+  return {
+    data: {
+      links,
+      nextCursor:
+        links.length === paginationTakeCount
+          ? links[links.length - 1].id
+          : null,
+    },
+    statusCode: 200,
+    success: true,
+    message: "Success",
+  };
+}

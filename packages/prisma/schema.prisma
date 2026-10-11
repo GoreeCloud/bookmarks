@@ -1,0 +1,324 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            Int
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model User {
+  id                      Int                   @id @default(autoincrement())
+  uuid                    String                @unique @default(uuid()) @db.Uuid
+  name                    String?
+  username                String?               @unique
+  email                   String?               @unique
+  emailVerified           DateTime?
+  unverifiedNewEmail      String?
+  image                   String?
+  password                String?
+  locale                  String                @default("en")
+  parentSubscription      Subscription?         @relation("ChildUsers", fields: [parentSubscriptionId], references: [id])
+  parentSubscriptionId    Int?
+  accounts                Account[]
+  collections             Collection[]
+  tags                    Tag[]
+  pinnedLinks             Link[]                @relation("PinnedLinks")
+  createdLinks            Link[]                @relation("CreatedLinks")
+  createdCollections      Collection[]          @relation("CreatedCollections")
+  highlights              Highlight[]
+  collectionsJoined       UsersAndCollections[]
+  collectionOrder         Int[]                 @default([])
+  whitelistedUsers        WhitelistedUser[]
+  accessTokens            AccessToken[]
+  subscriptions           Subscription?
+  linksRouteTo            LinksRouteTo          @default(ORIGINAL)
+  aiTaggingMethod         AiTaggingMethod       @default(DISABLED)
+  aiPredefinedTags        String[]              @default([])
+  aiTagExistingLinks      Boolean               @default(false)
+  theme                   Theme                 @default(dark)
+  dismissedAnnouncementId String?
+  readableFontFamily      String?               @default("sans-serif")
+  readableFontSize        String?               @default("20px")
+  readableLineHeight      String?               @default("1.8")
+  readableLineWidth       String?               @default("normal")
+  preventDuplicateLinks   Boolean               @default(false)
+  archiveAsScreenshot     Boolean               @default(true)
+  archiveAsMonolith       Boolean               @default(true)
+  archiveAsPDF            Boolean               @default(true)
+  archiveAsReadable       Boolean               @default(true)
+  archiveAsWaybackMachine Boolean               @default(false)
+  isPrivate               Boolean               @default(false)
+  referredBy              String?
+  dashboardSections       DashboardSection[]
+  lastPickedAt            DateTime?
+  acceptPromotionalEmails Boolean               @default(false)
+  trialEndEmailSent       Boolean               @default(false)
+  createdAt               DateTime              @default(now())
+  updatedAt               DateTime              @default(now()) @updatedAt
+}
+
+enum Theme {
+  dark
+  light
+  auto
+}
+
+enum AiTaggingMethod {
+  DISABLED
+  GENERATE
+  EXISTING
+  PREDEFINED
+}
+
+enum LinksRouteTo {
+  ORIGINAL
+  PDF
+  READABLE
+  MONOLITH
+  SCREENSHOT
+  DETAILS
+}
+
+model WhitelistedUser {
+  id        Int      @id @default(autoincrement())
+  username  String   @default("")
+  User      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    Int?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @default(now()) @updatedAt
+
+  @@unique([identifier, token])
+}
+
+model PasswordResetToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @default(now()) @updatedAt
+}
+
+model Collection {
+  id               Int                   @id @default(autoincrement())
+  name             String
+  description      String                @default("")
+  icon             String?
+  iconWeight       String?
+  color            String                @default("#0ea5e9")
+  parentId         Int?
+  parent           Collection?           @relation("SubCollections", fields: [parentId], references: [id], onDelete: Cascade)
+  subCollections   Collection[]          @relation("SubCollections")
+  isPublic         Boolean               @default(false)
+  owner            User                  @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  ownerId          Int
+  members          UsersAndCollections[]
+  createdBy        User?                 @relation("CreatedCollections", fields: [createdById], references: [id])
+  createdById      Int?
+  links            Link[]
+  rssSubscriptions RssSubscription[]
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @default(now()) @updatedAt
+  DashboardSection DashboardSection[]
+
+  @@index([ownerId])
+}
+
+model UsersAndCollections {
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId       Int
+  collection   Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  collectionId Int
+  canCreate    Boolean
+  canUpdate    Boolean
+  canDelete    Boolean
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @default(now()) @updatedAt
+
+  @@id([userId, collectionId])
+  @@index([userId])
+}
+
+model Link {
+  id              Int         @id @default(autoincrement())
+  name            String      @default("")
+  type            String      @default("url")
+  description     String      @default("")
+  highlight       Highlight[]
+  pinnedBy        User[]      @relation("PinnedLinks")
+  createdBy       User?       @relation("CreatedLinks", fields: [createdById], references: [id], onDelete: Cascade)
+  createdById     Int?
+  collection      Collection  @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  collectionId    Int
+  tags            Tag[]
+  icon            String?
+  iconWeight      String?
+  color           String?
+  url             String?
+  textContent     String?
+  preview         String?
+  image           String?
+  pdf             String?
+  readable        String?
+  monolith        String?
+  clientSide      Boolean     @default(false)
+  aiTagged        Boolean     @default(false)
+  metaDescription String?
+  indexVersion    Int?
+  lastPreserved   DateTime?
+  importDate      DateTime?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @default(now()) @updatedAt
+
+  @@index([collectionId])
+}
+
+model Tag {
+  id                      Int      @id @default(autoincrement())
+  name                    String
+  links                   Link[]
+  owner                   User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  ownerId                 Int
+  archiveAsScreenshot     Boolean?
+  archiveAsMonolith       Boolean?
+  archiveAsPDF            Boolean?
+  archiveAsReadable       Boolean?
+  archiveAsWaybackMachine Boolean?
+  aiTag                   Boolean?
+  aiGenerated             Boolean  @default(false)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @default(now()) @updatedAt
+
+  @@unique([name, ownerId])
+  @@index([ownerId])
+}
+
+model Subscription {
+  id                     Int      @id @default(autoincrement())
+  active                 Boolean
+  provider               SubscriptionProvider
+  currentPeriodStart     DateTime
+  currentPeriodEnd       DateTime
+  quantity               Int      @default(1)
+  
+  storeOriginalTransactionId String?              @unique
+  storeProductId             String?
+  googlePurchaseToken        String?              @unique // Google Play purchase token — the key for querying/acknowledging the subscription
+  storeMetadata              Json?
+
+  stripeSubscriptionId   String?  @unique
+  
+  user                   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId                 Int      @unique
+  childUsers             User[]   @relation("ChildUsers")
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @default(now()) @updatedAt
+}
+
+enum SubscriptionProvider {
+  STRIPE
+  APPLE
+  GOOGLE
+}
+
+model AccessToken {
+  id         Int       @id @default(autoincrement())
+  name       String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     Int
+  token      String    @unique
+  revoked    Boolean   @default(false)
+  isSession  Boolean   @default(false)
+  expires    DateTime
+  lastUsedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @default(now()) @updatedAt
+}
+
+model RssSubscription {
+  id            Int        @id @default(autoincrement())
+  url           String
+  name          String
+  lastBuildDate DateTime?
+  collection    Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  collectionId  Int
+  ownerId       Int
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @default(now()) @updatedAt
+}
+
+model Highlight {
+  id          Int      @id @default(autoincrement())
+  color       String
+  comment     String?
+  link        Link     @relation(fields: [linkId], references: [id], onDelete: Cascade)
+  linkId      Int
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      Int
+  startOffset Int
+  endOffset   Int
+  text        String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+}
+
+model DashboardSection {
+  id           Int                  @id @default(autoincrement())
+  user         User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId       Int
+  collection   Collection?          @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  collectionId Int?
+  type         DashboardSectionType
+  order        Int
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @default(now()) @updatedAt
+
+  @@unique([userId, collectionId])
+}
+
+enum DashboardSectionType {
+  STATS
+  RECENT_LINKS
+  PINNED_LINKS
+  COLLECTION
+}
+
+model AppMigration {
+  id         Int                @id @default(autoincrement())
+  name       String             @unique
+  status     AppMigrationStatus
+  finishedAt DateTime?
+  createdAt  DateTime           @default(now())
+}
+
+enum AppMigrationStatus {
+  APPLIED
+  PENDING
+  FAILED
+}

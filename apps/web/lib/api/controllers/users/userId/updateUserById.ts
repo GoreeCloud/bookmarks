@@ -1,0 +1,272 @@
+import { prisma } from "@linkwarden/prisma";
+import { AccountSettings } from "@linkwarden/types/global";
+import bcrypt from "bcrypt";
+import { removeFile, createFile, createFolder } from "@linkwarden/filesystem";
+import sendChangeEmailVerificationRequest from "@/lib/api/sendChangeEmailVerificationRequest";
+import { i18n } from "next-i18next.config";
+import { UpdateUserSchema } from "@linkwarden/lib/schemaValidation";
+
+const emailEnabled =
+  process.env.EMAIL_FROM && process.env.EMAIL_SERVER ? true : false;
+
+export default async function updateUserById(
+  userId: number,
+  body: AccountSettings
+) {
+  const dataValidation = UpdateUserSchema().safeParse(body);
+
+  if (!dataValidation.success) {
+    return {
+      response: `Error: ${
+        dataValidation.error.issues[0].message
+      } [${dataValidation.error.issues[0].path.join(", ")}]`,
+      status: 400,
+    };
+  }
+
+  const data = dataValidation.data;
+
+  const userIsTaken = await prisma.user.findFirst({
+    where: {
+      id: { not: userId },
+      OR: emailEnabled
+        ? [
+            {
+              username: data.username.toLowerCase(),
+            },
+            {
+              email: data.email?.toLowerCase(),
+            },
+          ]
+        : [
+            {
+              username: data.username.toLowerCase(),
+            },
+          ],
+    },
+  });
+
+  if (userIsTaken) {
+    if (data.email?.toLowerCase().trim() === userIsTaken.email?.trim())
+      return {
+        response: "Email is taken.",
+        status: 400,
+      };
+    else if (
+      data.username?.toLowerCase().trim() === userIsTaken.username?.trim()
+    )
+      return {
+        response: "Username is taken.",
+        status: 400,
+      };
+
+    return {
+      response: "Username/Email is taken.",
+      status: 400,
+    };
+  }
+
+  // Avatar Settings
+
+  if (
+    data.image?.startsWith("data:image/jpeg;base64") &&
+    data.image.length < 1572864
+  ) {
+    try {
+      const base64Data = data.image.replace(/^data:image\/jpeg;base64,/, "");
+
+      createFolder({ filePath: `uploads/avatar` });
+
+      await createFile({
+        filePath: `uploads/avatar/${userId}.jpg`,
+        data: base64Data,
+        isBase64: true,
+      });
+    } catch (err) {
+      console.log("Error saving image:", err);
+    }
+  } else if (data.image?.length && data.image?.length >= 1572864) {
+    console.log("A file larger than 1.5MB was uploaded.");
+    return {
+      response: "A file larger than 1.5MB was uploaded.",
+      status: 400,
+    };
+  } else if (data.image == "") {
+    removeFile({ filePath: `uploads/avatar/${userId}.jpg` });
+  }
+
+  // Email Settings
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: {
+      accounts: {
+        select: {
+          type: true,
+        },
+      },
+    },
+  });
+
+  const hasOAuthAccount =
+    user?.accounts.some((account) =>
+      ["oauth", "oidc"].includes(account.type)
+    ) || false;
+
+  if (user && user.email && data.email && data.email !== user.email) {
+    if (!data.password) {
+      return {
+        response: "Invalid password.",
+        status: 400,
+      };
+    }
+
+    // Verify password
+    if (!user.password) {
+      return {
+        response:
+          "User has no password. Please create one from the password settings page.",
+        status: 400,
+      };
+    }
+
+    const passwordMatch = bcrypt.compareSync(data.password, user.password);
+
+    if (!passwordMatch) {
+      return {
+        response: "Password is incorrect.",
+        status: 400,
+      };
+    }
+
+    sendChangeEmailVerificationRequest(
+      user.email,
+      data.email,
+      data.name?.trim() || user.name || "Linkwarden User"
+    );
+  }
+
+  // Password Settings
+
+  if (data.newPassword || data.oldPassword) {
+    const isCreatingPassword = !user?.password && hasOAuthAccount;
+
+    if (!data.newPassword || (!isCreatingPassword && !data.oldPassword))
+      return {
+        response: "Please fill out all the fields.",
+        status: 400,
+      };
+    else if (!user?.password && !isCreatingPassword)
+      return {
+        response:
+          "User has no password. Please create one from the password settings page.",
+        status: 400,
+      };
+    else if (
+      !isCreatingPassword &&
+      user?.password &&
+      data.oldPassword &&
+      !bcrypt.compareSync(data.oldPassword, user.password)
+    )
+      return {
+        response: "Old password is incorrect.",
+        status: 400,
+      };
+    else if (!isCreatingPassword && data.newPassword === data.oldPassword)
+      return {
+        response: "New password must be different from the old password.",
+        status: 400,
+      };
+  }
+
+  // Other settings / Apply changes
+
+  const isInvited =
+    user?.name === null && user.parentSubscriptionId && !user.password;
+
+  if (isInvited && data.password === "")
+    return {
+      response: "Password is required.",
+      status: 400,
+    };
+
+  const saltRounds = 10;
+  const newHashedPassword = bcrypt.hashSync(
+    data.newPassword || data.password || "",
+    saltRounds
+  );
+
+  const updatedUser = await prisma.user.update({
+    where: {
+      id: userId,
+    },
+    data: {
+      name: data.name,
+      username: data.username,
+      image:
+        data.image && data.image.startsWith("http")
+          ? data.image
+          : data.image
+            ? `uploads/avatar/${userId}.jpg`
+            : "",
+      collectionOrder: data.collectionOrder?.filter(
+        (value, index, self) => self.indexOf(value) === index
+      ),
+      aiTaggingMethod: data.aiTaggingMethod,
+      aiPredefinedTags: data.aiPredefinedTags,
+      aiTagExistingLinks: data.aiTagExistingLinks,
+      locale: i18n.locales.includes(data.locale || "") ? data.locale : "en",
+      archiveAsScreenshot: data.archiveAsScreenshot,
+      archiveAsMonolith: data.archiveAsMonolith,
+      archiveAsPDF: data.archiveAsPDF,
+      archiveAsReadable: data.archiveAsReadable,
+      archiveAsWaybackMachine: data.archiveAsWaybackMachine,
+      linksRouteTo: data.linksRouteTo,
+      preventDuplicateLinks: data.preventDuplicateLinks,
+      referredBy:
+        !user?.referredBy && data.referredBy ? data.referredBy : undefined,
+      password:
+        isInvited || (data.newPassword && data.newPassword !== "")
+          ? newHashedPassword
+          : undefined,
+    },
+    include: {
+      subscriptions: true,
+      dashboardSections: true,
+      parentSubscription: {
+        include: {
+          user: true,
+        },
+      },
+    },
+  });
+
+  const {
+    password,
+    subscriptions,
+    dashboardSections,
+    parentSubscription,
+    ...userInfo
+  } = updatedUser;
+
+  const response = {
+    ...userInfo,
+    image: userInfo.image ? `${userInfo.image}?${Date.now()}` : "",
+    subscription: {
+      active: subscriptions?.active,
+      quantity: subscriptions?.quantity,
+      provider: subscriptions?.provider,
+    },
+    parentSubscription: {
+      active: parentSubscription?.active,
+      user: {
+        email: parentSubscription?.user.email,
+      },
+    },
+    hasPassword: !!password,
+    hasOAuthAccount,
+    dashboardSections: dashboardSections,
+  };
+
+  return { response, status: 200 };
+}

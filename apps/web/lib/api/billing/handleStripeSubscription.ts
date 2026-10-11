@@ -1,0 +1,105 @@
+import Stripe from "stripe";
+import { prisma } from "@linkwarden/prisma";
+import stripeSDK from "./stripeSDK";
+import { stripeStoreReset } from "./stripeStoreReset";
+
+type Data = {
+  id: string;
+  active: boolean;
+  quantity: number;
+  periodStart: number;
+  periodEnd: number;
+  action:
+    | "customer.subscription.created"
+    | "customer.subscription.updated"
+    | "customer.subscription.deleted";
+};
+
+export default async function handleSubscription({
+  id,
+  active,
+  quantity,
+  periodStart,
+  periodEnd,
+  action,
+}: Data) {
+  const subscription = await prisma.subscription.findUnique({
+    where: {
+      stripeSubscriptionId: id,
+    },
+  });
+
+  if (subscription) {
+    await prisma.subscription.update({
+      where: {
+        stripeSubscriptionId: id,
+      },
+      data: {
+        active,
+        provider: "STRIPE",
+        ...stripeStoreReset,
+        quantity,
+        currentPeriodStart: new Date(periodStart * 1000),
+        currentPeriodEnd: new Date(periodEnd * 1000),
+      },
+    });
+    return;
+  } else {
+    const stripe = stripeSDK();
+
+    const subscription = await stripe.subscriptions.retrieve(id);
+    const customerId = subscription.customer;
+
+    const customer = await stripe.customers.retrieve(customerId.toString());
+    const email = (customer as Stripe.Customer).email;
+
+    if (!email) throw new Error("Email not found");
+
+    const user = await prisma.user.findUnique({
+      where: {
+        email,
+      },
+    });
+
+    if (!user) {
+      if (action === "customer.subscription.deleted") {
+        return "User not found or deleted.";
+      } else {
+        throw new Error("User not found.");
+      }
+    }
+
+    const userId = user.id;
+
+    await prisma.subscription
+      .upsert({
+        where: {
+          userId,
+        },
+        create: {
+          active,
+          provider: "STRIPE",
+          ...stripeStoreReset,
+          stripeSubscriptionId: id,
+          quantity,
+          currentPeriodStart: new Date(periodStart * 1000),
+          currentPeriodEnd: new Date(periodEnd * 1000),
+          user: {
+            connect: {
+              id: userId,
+            },
+          },
+        },
+        update: {
+          active,
+          provider: "STRIPE",
+          ...stripeStoreReset,
+          stripeSubscriptionId: id,
+          quantity,
+          currentPeriodStart: new Date(periodStart * 1000),
+          currentPeriodEnd: new Date(periodEnd * 1000),
+        },
+      })
+      .catch((err) => console.log(err));
+  }
+}

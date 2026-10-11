@@ -1,0 +1,724 @@
+import SettingsLayout from "@/layouts/SettingsLayout";
+import { useState, useEffect, ReactElement } from "react";
+import { toast } from "react-hot-toast";
+import Checkbox from "@/components/Checkbox";
+import useLocalSettingsStore from "@/store/localSettings";
+import { useTranslation } from "next-i18next";
+import getServerSideProps from "@/lib/client/getServerSideProps";
+import { TagSort } from "@linkwarden/types/global";
+import { AiTaggingMethod, LinksRouteTo } from "@linkwarden/prisma/client";
+import {
+  useUpdateUser,
+  useUpdateUserPreference,
+  useUser,
+} from "@linkwarden/router/user";
+import { useConfig } from "@linkwarden/router/config";
+import { useTags, useUpsertTags } from "@linkwarden/router/tags";
+import TagSelection from "@/components/InputSelect/TagSelection";
+import { useArchivalTags } from "@/hooks/useArchivalTags";
+import { isArchivalTag } from "@linkwarden/lib/isArchivalTag";
+import { resolveTheme } from "@linkwarden/lib/utils";
+import { Button } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { Separator } from "@/components/ui/separator";
+import { NextPageWithLayout } from "../_app";
+
+const Page: NextPageWithLayout = () => {
+  const { t } = useTranslation();
+  const { settings, updateSettings } = useLocalSettingsStore();
+  const updateUserPreference = useUpdateUserPreference();
+  const { data: account } = useUser() as any;
+  const { data: tags } = useTags(undefined, {
+    sort: TagSort.NameAZ,
+  });
+  const upsertTags = useUpsertTags();
+  const {
+    ARCHIVAL_OPTIONS,
+    archivalTags,
+    options,
+    addTags,
+    toggleOption,
+    removeTag,
+  } = useArchivalTags(tags ? tags : []);
+  const updateUser = useUpdateUser();
+  const [aiSubmitLoader, setAiSubmitLoader] = useState(false);
+  const [archiveSubmitLoader, setArchiveSubmitLoader] = useState(false);
+  const [linkSubmitLoader, setLinkSubmitLoader] = useState(false);
+
+  const [preventDuplicateLinks, setPreventDuplicateLinks] = useState<boolean>(
+    account.preventDuplicateLinks || false
+  );
+  const [archiveAsScreenshot, setArchiveAsScreenshot] = useState<boolean>(
+    account.archiveAsScreenshot || false
+  );
+  const [archiveAsMonolith, setArchiveAsMonolith] = useState<boolean>(
+    account.archiveAsMonolith || false
+  );
+  const [archiveAsPDF, setArchiveAsPDF] = useState<boolean>(
+    account.archiveAsPDF || false
+  );
+  const [archiveAsReadable, setArchiveAsReadable] = useState<boolean>(false);
+  const [archiveAsWaybackMachine, setArchiveAsWaybackMachine] =
+    useState<boolean>(account.archiveAsWaybackMachine || false);
+  const [linksRouteTo, setLinksRouteTo] = useState(account.linksRouteTo);
+  const [aiTaggingMethod, setAiTaggingMethod] = useState<AiTaggingMethod>(
+    account.aiTaggingMethod
+  );
+  const [aiPredefinedTags, setAiPredefinedTags] = useState<string[]>();
+  const [aiTagExistingLinks, setAiTagExistingLinks] = useState<boolean>(
+    account.aiTagExistingLinks ?? false
+  );
+  const [hasArchiveTagChanges, setHasArchiveTagChanges] = useState(false);
+  const { data: config } = useConfig();
+
+  function objectIsEmpty(obj: object) {
+    return Object.keys(obj).length === 0;
+  }
+
+  useEffect(() => {
+    if (!objectIsEmpty(account)) {
+      setArchiveAsScreenshot(account.archiveAsScreenshot ?? false);
+      setArchiveAsMonolith(account.archiveAsMonolith ?? false);
+      setArchiveAsPDF(account.archiveAsPDF ?? false);
+      setArchiveAsReadable(account.archiveAsReadable ?? false);
+      setArchiveAsWaybackMachine(account.archiveAsWaybackMachine ?? false);
+      setLinksRouteTo(account.linksRouteTo);
+      setPreventDuplicateLinks(account.preventDuplicateLinks ?? false);
+      setAiTaggingMethod(account.aiTaggingMethod);
+      setAiPredefinedTags(account.aiPredefinedTags);
+      setAiTagExistingLinks(account.aiTagExistingLinks ?? false);
+    }
+  }, [account]);
+
+  useEffect(() => {
+    if (!tags || !archivalTags) return;
+
+    const hasChanges = archivalTags.some((newTag) => {
+      const originalTag = tags.find((t) => t.name === newTag.label);
+
+      if (!originalTag) return true;
+
+      return (
+        newTag.archiveAsScreenshot !== originalTag.archiveAsScreenshot ||
+        newTag.archiveAsMonolith !== originalTag.archiveAsMonolith ||
+        newTag.archiveAsPDF !== originalTag.archiveAsPDF ||
+        newTag.archiveAsReadable !== originalTag.archiveAsReadable ||
+        newTag.archiveAsWaybackMachine !==
+          originalTag.archiveAsWaybackMachine ||
+        newTag.aiTag !== originalTag.aiTag
+      );
+    });
+
+    setHasArchiveTagChanges(hasChanges);
+  }, [archivalTags, tags]);
+
+  const areStringArraysEqual = (a: string[] = [], b: string[] = []) =>
+    a.length === b.length && a.every((value, index) => value === b[index]);
+
+  const baseUserPayload = () => ({
+    id: account?.id,
+    username: account?.username,
+    email: account?.email,
+  });
+
+  const hasAiChanges =
+    !!account?.id &&
+    (aiTaggingMethod !== account.aiTaggingMethod ||
+      aiTagExistingLinks !== (account.aiTagExistingLinks ?? false) ||
+      !areStringArraysEqual(
+        aiPredefinedTags || [],
+        account.aiPredefinedTags || []
+      ));
+
+  const hasArchivePreferenceChanges =
+    !!account?.id &&
+    (archiveAsScreenshot !== (account.archiveAsScreenshot ?? false) ||
+      archiveAsMonolith !== (account.archiveAsMonolith ?? false) ||
+      archiveAsPDF !== (account.archiveAsPDF ?? false) ||
+      archiveAsReadable !== (account.archiveAsReadable ?? false) ||
+      archiveAsWaybackMachine !== (account.archiveAsWaybackMachine ?? false));
+
+  const hasArchiveChanges = hasArchivePreferenceChanges || hasArchiveTagChanges;
+
+  const hasLinkChanges =
+    !!account?.id &&
+    (preventDuplicateLinks !== (account.preventDuplicateLinks ?? false) ||
+      linksRouteTo !== account.linksRouteTo);
+
+  const saveAiSection = async () => {
+    if (!account?.id || !hasAiChanges) return;
+
+    setAiSubmitLoader(true);
+    const load = toast.loading(t("applying_settings"));
+
+    try {
+      const payload: any = {
+        ...baseUserPayload(),
+        aiTaggingMethod,
+        aiTagExistingLinks,
+      };
+
+      if (aiPredefinedTags !== undefined) {
+        payload.aiPredefinedTags = aiPredefinedTags;
+      }
+
+      await updateUser.mutateAsync(payload);
+      toast.success(t("settings_applied"));
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setAiSubmitLoader(false);
+      toast.dismiss(load);
+    }
+  };
+
+  const saveArchiveSection = async () => {
+    if (!account?.id || !hasArchiveChanges) return;
+
+    setArchiveSubmitLoader(true);
+    const load = toast.loading(t("applying_settings"));
+
+    try {
+      const promises = [];
+
+      if (hasArchivePreferenceChanges) {
+        promises.push(
+          updateUser.mutateAsync({
+            ...baseUserPayload(),
+            archiveAsScreenshot,
+            archiveAsMonolith,
+            archiveAsPDF,
+            archiveAsReadable,
+            archiveAsWaybackMachine,
+          })
+        );
+      }
+
+      if (hasArchiveTagChanges) {
+        promises.push(upsertTags.mutateAsync(archivalTags));
+      }
+
+      if (promises.length > 0) {
+        await Promise.all(promises);
+      }
+
+      toast.success(t("settings_applied"));
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setArchiveSubmitLoader(false);
+      toast.dismiss(load);
+    }
+  };
+
+  const saveLinkSection = async () => {
+    if (!account?.id || !hasLinkChanges) return;
+
+    setLinkSubmitLoader(true);
+    const load = toast.loading(t("applying_settings"));
+
+    try {
+      await updateUser.mutateAsync({
+        ...baseUserPayload(),
+        preventDuplicateLinks,
+        linksRouteTo,
+      });
+
+      toast.success(t("settings_applied"));
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setLinkSubmitLoader(false);
+      toast.dismiss(load);
+    }
+  };
+
+  return (
+    <>
+      <div className="flex items-center gap-2">
+        <i className="bi-palette text-primary text-2xl"></i>
+        <p className="capitalize text-3xl font-thin inline">
+          {t("preferences")}
+        </p>
+      </div>
+
+      <Separator className="my-3" />
+
+      <div className="flex flex-col gap-5">
+        <div className="max-w-screen-sm w-full mx-auto">
+          <div className="flex gap-3 w-full">
+            {[
+              {
+                theme: "auto",
+                label: t("system"),
+                icon: "bi-circle-half",
+                bgColor: "bg-[linear-gradient(110deg,#000_50%,#fff_50%)]",
+                textColor: "text-white mix-blend-difference",
+                activeColor: "text-white mix-blend-difference",
+              },
+              {
+                theme: "dark",
+                label: t("dark"),
+                icon: "bi-moon-fill",
+                bgColor: "bg-black",
+                textColor: "text-white",
+                activeColor: "text-primary",
+              },
+              {
+                theme: "light",
+                label: t("light"),
+                icon: "bi-sun-fill",
+                bgColor: "bg-white",
+                textColor: "text-black",
+                activeColor: "text-primary",
+              },
+            ].map(({ theme, label, icon, bgColor, textColor, activeColor }) => (
+              <div
+                key={theme}
+                className={`w-full text-center outline-solid outline-neutral-content outline h-20 duration-100 rounded-xl flex items-center justify-center cursor-pointer select-none ${bgColor} ${
+                  account.theme === theme ? "outline-primary" : ""
+                }`}
+                onClick={() => {
+                  updateUserPreference.mutate({ theme: theme as any });
+                  document.documentElement.setAttribute(
+                    "data-theme",
+                    resolveTheme(theme) || theme
+                  );
+                }}
+              >
+                <span
+                  className={`flex items-center ${
+                    account.theme === theme ? activeColor : textColor
+                  }`}
+                >
+                  <i className={`${icon} sm:text-3xl text-lg`}></i>
+                  <p className="ml-2 sm:text-xl text-lg">{label}</p>
+                </span>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-3">
+            <div className="flex gap-3 mx-auto">
+              {[
+                "--default",
+                "--red",
+                "--rose",
+                "--yellow",
+                "--green",
+                "--orange",
+                "--zinc",
+              ].map((color) => (
+                <div
+                  key={color}
+                  className="relative rounded-xl h-10 w-20 cursor-pointer"
+                  style={{ backgroundColor: `oklch(var(${color}))` }}
+                  onClick={() => updateSettings({ color })}
+                >
+                  {settings.color === color && (
+                    <i className="bi-check2 text-xl text-base-100 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2"></i>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {config?.AI_ENABLED && (
+          <div>
+            <div className="flex items-center gap-2">
+              <i className="bi-cpu text-primary text-2xl"></i>
+              <p className="capitalize text-3xl font-thin inline">
+                {t("ai_settings")}
+              </p>
+            </div>
+
+            <Separator className="my-3" />
+
+            <p>{t("ai_tagging_method")}</p>
+
+            <div className="p-3 max-w-screen-sm">
+              <label
+                className="label cursor-pointer flex gap-2 justify-start w-fit"
+                tabIndex={0}
+                role="button"
+              >
+                <input
+                  type="radio"
+                  name="ai-tagging-method-radio"
+                  className="radio checked:bg-primary"
+                  value="DISABLED"
+                  checked={aiTaggingMethod === AiTaggingMethod.DISABLED}
+                  onChange={() => setAiTaggingMethod(AiTaggingMethod.DISABLED)}
+                />
+                <span className="label-text">{t("disabled")}</span>
+              </label>
+              <p className="text-neutral text-sm pl-5">
+                {t("ai_tagging_disabled_desc")}
+              </p>
+
+              <label
+                className="label cursor-pointer flex gap-2 justify-start w-fit"
+                tabIndex={0}
+                role="button"
+              >
+                <input
+                  type="radio"
+                  name="ai-tagging-method-radio"
+                  className="radio checked:bg-primary"
+                  value="GENERATE"
+                  checked={aiTaggingMethod === AiTaggingMethod.GENERATE}
+                  onChange={() => setAiTaggingMethod(AiTaggingMethod.GENERATE)}
+                />
+                <span className="label-text">{t("auto_generate_tags")}</span>
+              </label>
+              <p className="text-neutral text-sm pl-5">
+                {t("auto_generate_tags_desc")}
+              </p>
+
+              <label
+                className="label cursor-pointer flex gap-2 justify-start w-fit"
+                tabIndex={0}
+                role="button"
+              >
+                <input
+                  type="radio"
+                  name="ai-tagging-method-radio"
+                  className="radio checked:bg-primary"
+                  value="EXISTING"
+                  checked={aiTaggingMethod === AiTaggingMethod.EXISTING}
+                  onChange={() => setAiTaggingMethod(AiTaggingMethod.EXISTING)}
+                />
+                <span className="label-text">
+                  {t("based_on_existing_tags")}
+                </span>
+              </label>
+              <p className="text-neutral text-sm pl-5">
+                {t("based_on_existing_tags_desc")}
+              </p>
+
+              <label
+                className="label cursor-pointer flex gap-2 justify-start w-fit"
+                tabIndex={0}
+                role="button"
+              >
+                <input
+                  type="radio"
+                  name="ai-tagging-method-radio"
+                  className="radio checked:bg-primary"
+                  value="PREDEFINED"
+                  checked={aiTaggingMethod === AiTaggingMethod.PREDEFINED}
+                  onChange={() =>
+                    setAiTaggingMethod(AiTaggingMethod.PREDEFINED)
+                  }
+                />
+                <span className="label-text">
+                  {t("based_on_predefined_tags")}
+                </span>
+              </label>
+              <div className="pl-5">
+                <p className="text-neutral text-sm mb-2">
+                  {t("based_on_predefined_tags_desc")}
+                </p>
+                {aiPredefinedTags && (
+                  <TagSelection
+                    onChange={(e: any) => {
+                      setAiPredefinedTags(e.map((e: any) => e.label));
+                    }}
+                    defaultValue={aiPredefinedTags
+                      .map((e) => ({ label: e }))
+                      .filter((e) => e.label !== "")}
+                  />
+                )}
+              </div>
+            </div>
+            <div
+              className={`mb-3 ${
+                aiTaggingMethod === AiTaggingMethod.DISABLED ? "opacity-50" : ""
+              }`}
+            >
+              <Checkbox
+                label={t("generate_tags_for_existing_links")}
+                state={aiTagExistingLinks}
+                onClick={() =>
+                  aiTaggingMethod !== AiTaggingMethod.DISABLED &&
+                  setAiTagExistingLinks(!aiTagExistingLinks)
+                }
+                disabled={aiTaggingMethod === AiTaggingMethod.DISABLED}
+              />
+            </div>
+            <Button
+              onClick={saveAiSection}
+              disabled={aiSubmitLoader || !hasAiChanges}
+              className="mt-2 w-full sm:w-fit"
+              variant="primary"
+            >
+              {t("save_changes")}
+            </Button>
+          </div>
+        )}
+
+        <div>
+          <div className="flex items-center gap-2">
+            <i className="bi-archive text-primary text-2xl"></i>
+            <p className="capitalize text-3xl font-thin inline">
+              {t("archive_settings")}
+            </p>
+          </div>
+
+          <Separator className="my-3" />
+
+          <p>{t("formats_to_archive")}</p>
+          <div className="p-3">
+            <Checkbox
+              label={t("screenshot")}
+              state={archiveAsScreenshot}
+              onClick={() => setArchiveAsScreenshot(!archiveAsScreenshot)}
+            />
+
+            <Checkbox
+              label={t("webpage")}
+              state={archiveAsMonolith}
+              onClick={() => setArchiveAsMonolith(!archiveAsMonolith)}
+            />
+
+            <Checkbox
+              label={t("pdf")}
+              state={archiveAsPDF}
+              onClick={() => setArchiveAsPDF(!archiveAsPDF)}
+            />
+
+            <Checkbox
+              label={t("readable")}
+              state={archiveAsReadable}
+              onClick={() => setArchiveAsReadable(!archiveAsReadable)}
+            />
+
+            <Checkbox
+              label={t("archive_org_snapshot")}
+              state={archiveAsWaybackMachine}
+              onClick={() =>
+                setArchiveAsWaybackMachine(!archiveAsWaybackMachine)
+              }
+            />
+          </div>
+          <div className="max-w-full">
+            <p>{t("tag_preservation_rule_label")}</p>
+          </div>
+          <div className="p-3 max-w-screen-sm">
+            <TagSelection
+              isArchivalSelection
+              onChange={addTags}
+              options={options}
+            />
+            <div className="flex flex-col gap-2">
+              {archivalTags &&
+                archivalTags.filter(isArchivalTag).map((tag) => (
+                  <div
+                    key={tag.label}
+                    className="w-full bg-base-200 py-2 px-4 rounded-md first-of-type:mt-4 max-w-full shadow"
+                  >
+                    <div className="flex justify-between gap-1">
+                      <span className="block sm:text-lg truncate max-w-sm">
+                        {tag.label}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removeTag(tag)}
+                        className="hover:text-error"
+                      >
+                        <i className="bi-x text-lg leading-none"></i>
+                      </Button>
+                    </div>
+                    <div className="flex flex-wrap items-center justify-between gap-1 mt-1">
+                      <p className="text-sm">{t("preservation_rules")}</p>
+                      <div className="flex gap-1">
+                        {ARCHIVAL_OPTIONS.map(({ type, icon, label }) => (
+                          <TooltipProvider key={type}>
+                            <Tooltip>
+                              <TooltipTrigger>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => toggleOption(tag, type)}
+                                  className={
+                                    tag[type]
+                                      ? "bg-primary hover:bg-primary text-primary-foreground hover:text-primary-foreground"
+                                      : ""
+                                  }
+                                >
+                                  <i
+                                    className={`${icon} text-lg leading-none`}
+                                  ></i>
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>{label}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+            </div>
+          </div>
+          <Button
+            onClick={saveArchiveSection}
+            disabled={archiveSubmitLoader || !hasArchiveChanges}
+            className="mt-2 w-full sm:w-fit"
+            variant="primary"
+          >
+            {t("save_changes")}
+          </Button>
+        </div>
+
+        <div>
+          <div className="flex items-center gap-2">
+            <i className="bi-link-45deg text-primary text-2xl"></i>
+            <p className="capitalize text-3xl font-thin inline">
+              {t("link_settings")}
+            </p>
+          </div>
+
+          <Separator className="my-3" />
+
+          <div className="mb-3">
+            <Checkbox
+              label={t("prevent_duplicate_links")}
+              state={preventDuplicateLinks}
+              onClick={() => setPreventDuplicateLinks(!preventDuplicateLinks)}
+            />
+          </div>
+          <p>{t("clicking_on_links_should")}</p>
+          <div className="p-3">
+            <label
+              className="label cursor-pointer flex gap-2 justify-start w-fit"
+              tabIndex={0}
+              role="button"
+            >
+              <input
+                type="radio"
+                name="link-preference-radio"
+                className="radio checked:bg-primary"
+                value="Original"
+                checked={linksRouteTo === LinksRouteTo.ORIGINAL}
+                onChange={() => setLinksRouteTo(LinksRouteTo.ORIGINAL)}
+              />
+              <span className="label-text">{t("open_original_content")}</span>
+            </label>
+
+            <label
+              className="label cursor-pointer flex gap-2 justify-start w-fit"
+              tabIndex={0}
+              role="button"
+            >
+              <input
+                type="radio"
+                name="link-preference-radio"
+                className="radio checked:bg-primary"
+                value="Details"
+                checked={linksRouteTo === LinksRouteTo.DETAILS}
+                onChange={() => setLinksRouteTo(LinksRouteTo.DETAILS)}
+              />
+              <span className="label-text">{t("show_link_details")}</span>
+            </label>
+
+            <label
+              className="label cursor-pointer flex gap-2 justify-start w-fit"
+              tabIndex={0}
+              role="button"
+            >
+              <input
+                type="radio"
+                name="link-preference-radio"
+                className="radio checked:bg-primary"
+                value="PDF"
+                checked={linksRouteTo === LinksRouteTo.PDF}
+                onChange={() => setLinksRouteTo(LinksRouteTo.PDF)}
+              />
+              <span className="label-text">{t("open_pdf_if_available")}</span>
+            </label>
+
+            <label
+              className="label cursor-pointer flex gap-2 justify-start w-fit"
+              tabIndex={0}
+              role="button"
+            >
+              <input
+                type="radio"
+                name="link-preference-radio"
+                className="radio checked:bg-primary"
+                value="Readable"
+                checked={linksRouteTo === LinksRouteTo.READABLE}
+                onChange={() => setLinksRouteTo(LinksRouteTo.READABLE)}
+              />
+              <span className="label-text">
+                {t("open_readable_if_available")}
+              </span>
+            </label>
+
+            <label
+              className="label cursor-pointer flex gap-2 justify-start w-fit"
+              tabIndex={0}
+              role="button"
+            >
+              <input
+                type="radio"
+                name="link-preference-radio"
+                className="radio checked:bg-primary"
+                value="Monolith"
+                checked={linksRouteTo === LinksRouteTo.MONOLITH}
+                onChange={() => setLinksRouteTo(LinksRouteTo.MONOLITH)}
+              />
+              <span className="label-text">
+                {t("open_webpage_if_available")}
+              </span>
+            </label>
+
+            <label
+              className="label cursor-pointer flex gap-2 justify-start w-fit"
+              tabIndex={0}
+              role="button"
+            >
+              <input
+                type="radio"
+                name="link-preference-radio"
+                className="radio checked:bg-primary"
+                value="Screenshot"
+                checked={linksRouteTo === LinksRouteTo.SCREENSHOT}
+                onChange={() => setLinksRouteTo(LinksRouteTo.SCREENSHOT)}
+              />
+              <span className="label-text">
+                {t("open_screenshot_if_available")}
+              </span>
+            </label>
+          </div>
+          <Button
+            onClick={saveLinkSection}
+            disabled={linkSubmitLoader || !hasLinkChanges}
+            className="mt-2 w-full sm:w-fit"
+            variant="primary"
+          >
+            {t("save_changes")}
+          </Button>
+        </div>
+      </div>
+    </>
+  );
+};
+
+Page.getLayout = function getLayout(page: ReactElement<any>) {
+  return <SettingsLayout>{page}</SettingsLayout>;
+};
+
+export default Page;
+
+export { getServerSideProps };

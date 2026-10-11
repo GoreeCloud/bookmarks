@@ -1,0 +1,137 @@
+import { UpdateUserPreferenceSchemaType } from "@linkwarden/lib/schemaValidation";
+import { resolveTheme } from "@linkwarden/lib/utils";
+import { Subscription, User } from "@linkwarden/prisma/client";
+import { GetUserByIdResponse, MobileAuth } from "@linkwarden/types/global";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useSession } from "next-auth/react";
+
+const useUser = (auth?: MobileAuth) => {
+  let status: "authenticated" | "loading" | "unauthenticated";
+  let userId: string = "";
+
+  if (!auth) {
+    const { data, status: s } = useSession();
+    status = s;
+    userId = (data?.user as any)?.id;
+  } else {
+    status = auth.status;
+  }
+
+  const url = auth
+    ? auth?.instance + "/api/v1/users/me"
+    : "/api/v1/users/" + userId;
+
+  return useQuery({
+    queryKey: ["user"],
+    queryFn: async () => {
+      const response = await fetch(
+        url,
+        auth?.session
+          ? {
+              headers: {
+                Authorization: `Bearer ${auth.session}`,
+              },
+            }
+          : undefined
+      );
+
+      if (!response.ok)
+        throw Object.assign(new Error("Failed to fetch user data."), {
+          status: response.status,
+        });
+
+      const data = (await response.json()).response as GetUserByIdResponse;
+
+      if (!auth)
+        document
+          .querySelector("html")
+          ?.setAttribute("data-theme", resolveTheme(data.theme) || "dark");
+
+      return data;
+    },
+    enabled: !auth
+      ? !!userId && status === "authenticated"
+      : status === "authenticated",
+    placeholderData: {} as GetUserByIdResponse,
+  });
+};
+
+const useUpdateUser = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (user: any) => {
+      const response = await fetch(`/api/v1/users/${user.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(user),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) throw new Error(data.response);
+
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.setQueryData(["user"], data.response);
+    },
+    onMutate: async (user) => {
+      await queryClient.cancelQueries({ queryKey: ["user"] });
+      const safeUser = { ...user };
+      delete safeUser.password;
+      delete safeUser.oldPassword;
+      delete safeUser.newPassword;
+
+      queryClient.setQueryData(["user"], (oldData: any) => {
+        return { ...oldData, ...safeUser };
+      });
+    },
+  });
+};
+
+const useUpdateUserPreference = () => {
+  const queryClient = useQueryClient();
+  const { data: session } = useSession();
+
+  return useMutation({
+    mutationFn: async (preference: UpdateUserPreferenceSchemaType) => {
+      const response = await fetch(
+        `/api/v1/users/${(session?.user as any)?.id}/preference`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(preference),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) throw new Error(data.response);
+
+      return data.response as Omit<User, "password"> &
+        Partial<{ subscription: Subscription }> & {
+          parentSubscription: {
+            active: boolean | undefined;
+            user: {
+              email: string | null | undefined;
+            };
+          };
+        };
+    },
+    onSuccess: (data) => {
+      queryClient.setQueryData(["user"], data);
+      document
+        .querySelector("html")
+        ?.setAttribute("data-theme", resolveTheme(data.theme) || "dark");
+    },
+    onMutate: async (user) => {
+      await queryClient.cancelQueries({ queryKey: ["user"] });
+      queryClient.setQueryData(["user"], (oldData: any) => {
+        return { ...oldData, ...user };
+      });
+    },
+  });
+};
+
+export { useUser, useUpdateUser, useUpdateUserPreference };

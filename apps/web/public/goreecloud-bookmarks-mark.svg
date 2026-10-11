@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title id="title">GoreeCloud Bookmarks</title>
+  <rect width="64" height="64" rx="16" fill="#11233b"/>
+  <path d="M17 14h30a3 3 0 0 1 3 3v33L32 40 14 50V17a3 3 0 0 1 3-3Z" fill="#8fc3ff"/>
+  <path d="M24 22h16M24 29h12" fill="none" stroke="#11233b" stroke-width="3" stroke-linecap="round"/>
+</svg>

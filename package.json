@@ -1,0 +1,41 @@
+{
+  "name": "goreecloud-bookmarks",
+  "packageManager": "yarn@4.12.0+sha512.f45ab632439a67f8bc759bf32ead036a1f413287b9042726b7cc4818b7b49e14e9423ba49b18f9e06ea4941c1ad062385b1d8760a8d5091a1a31e5f6219afca8",
+  "version": "0.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "web:dev": "dotenv -- yarn workspace @linkwarden/web dev",
+    "web:build": "dotenv -- yarn workspace @linkwarden/web build",
+    "web:start": "dotenv -- yarn workspace @linkwarden/web start",
+    "update:browserslist-db": "npx update-browserslist-db@latest",
+    "worker:dev": "dotenv -- yarn workspace @linkwarden/worker dev",
+    "worker:start": "dotenv -- yarn workspace @linkwarden/worker start",
+    "concurrently:dev": "concurrently \"dotenv -- yarn workspace @linkwarden/web dev\" \"dotenv -- yarn workspace @linkwarden/worker dev\"",
+    "concurrently:start": "concurrently \"dotenv -- yarn workspace @linkwarden/web start\" \"dotenv -- yarn workspace @linkwarden/worker start\"",
+    "prisma:deploy": "dotenv -- yarn workspace @linkwarden/prisma deploy",
+    "prisma:dev": "dotenv -- yarn workspace @linkwarden/prisma dev",
+    "prisma:generate": "yarn workspace @linkwarden/prisma generate",
+    "prisma:studio": "yarn workspace @linkwarden/prisma studio",
+    "docker:build": "docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build",
+    "format": "yarn workspaces run format",
+    "test": "vitest",
+    "coverage": "vitest run --coverage",
+    "postinstall": "yarn workspace @linkwarden/web run postinstall && patch-package"
+  },
+  "devDependencies": {
+    "vitest": "^4.1.0"
+  },
+  "dependencies": {
+    "concurrently": "^9.1.2",
+    "dotenv-cli": "^8.0.0",
+    "patch-package": "^8.0.0"
+  },
+  "resolutions": {
+    "react": "19.1.0",
+    "react-dom": "19.1.0"
+  }
+}
