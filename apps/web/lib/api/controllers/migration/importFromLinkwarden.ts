@@ -15,7 +15,7 @@ function validBackupShape(input: unknown): input is Backup {
       (input.pinnedLinks !== undefined && !Array.isArray(input.pinnedLinks))) {
     return false;
   }
-  if (input.pinnedLinks?.some((pin: unknown) =>
+  if (Array.isArray(input.pinnedLinks) && input.pinnedLinks.some((pin: unknown) =>
     !isRecord(pin) || !optionalText(pin.url))) {
     return false;
   }
