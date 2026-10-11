@@ -1,9 +1,14 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { toast } from "react-hot-toast";
 import { useTranslation } from "next-i18next";
 import { Button } from "@/components/ui/button";
+import {
+  appendSearchOperator,
+  readRouteSearchQuery,
+  removeUnsupportedSearchSymbols,
+} from "@/lib/client/searchInput";
 
 type Props = {
   placeholder?: string;
@@ -44,20 +49,20 @@ export default function SearchBar({ placeholder, fullWidth }: Props) {
   const [searchQuery, setSearchQuery] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const suggestionsRef = useRef<HTMLDivElement>(null);
+  const suggestionsId = useId();
 
   useEffect(() => {
-    router.query.q
-      ? setSearchQuery(decodeURIComponent(router.query.q as string))
-      : setSearchQuery("");
+    setSearchQuery(readRouteSearchQuery(router.query.q));
   }, [router.query.q]);
 
   const handleSuggestionClick = (operator: string) => {
-    setSearchQuery((prev) => {
-      const needsSpace = prev.length > 0 && !prev.endsWith(" ");
-      return `${prev}${needsSpace ? " " : ""}${operator}`;
-    });
+    setSearchQuery((prev) => appendSearchOperator(prev, operator));
     setShowSuggestions(false);
-    requestAnimationFrame(() => inputRef.current?.focus());
+    requestAnimationFrame(() => {
+      inputRef.current?.focus();
+      setShowSuggestions(false);
+    });
   };
 
   return (
@@ -65,6 +70,12 @@ export default function SearchBar({ placeholder, fullWidth }: Props) {
       className={`flex items-center relative group ${
         fullWidth ? "w-full" : ""
       }`}
+      onBlur={(event) => {
+        // Moving from the input to a suggestion must not dismiss the list.
+        if (!event.currentTarget.contains(event.relatedTarget)) {
+          setShowSuggestions(false);
+        }
+      }}
     >
       <label
         htmlFor="search-box"
@@ -79,19 +90,29 @@ export default function SearchBar({ placeholder, fullWidth }: Props) {
         ref={inputRef}
         placeholder={placeholder || t("search_for_links")}
         value={searchQuery}
+        aria-controls={showSuggestions ? suggestionsId : undefined}
+        aria-expanded={showSuggestions}
         onFocus={() => {
           setShowSuggestions(true);
-        }}
-        onBlur={() => {
-          setShowSuggestions(false);
         }}
         onChange={(e) => {
           e.target.value.includes("%") &&
             toast.error(t("search_query_invalid_symbol"));
-          setSearchQuery(e.target.value.replace("%", ""));
+          setSearchQuery(removeUnsupportedSearchSymbols(e.target.value));
           setShowSuggestions(false);
         }}
         onKeyDown={(e) => {
+          if (e.key === "Escape") {
+            setShowSuggestions(false);
+            return;
+          }
+          if (e.key === "ArrowDown" && showSuggestions) {
+            e.preventDefault();
+            suggestionsRef.current?.querySelector<HTMLButtonElement>(
+              '[data-search-operator]'
+            )?.focus();
+            return;
+          }
           if (e.key === "Enter") {
             if (router.pathname.startsWith("/public")) {
               if (!searchQuery) {
@@ -119,8 +140,21 @@ export default function SearchBar({ placeholder, fullWidth }: Props) {
       {showSuggestions && (
         <div className="absolute left-0 top-full mt-2 w-full z-50">
           <div
+            id={suggestionsId}
+            ref={suggestionsRef}
+            role="group"
+            aria-label={t("suggested_search_operators")}
             className="border border-neutral-content bg-base-200 shadow-md rounded-md px-2 py-1 flex flex-col gap-1"
             onMouseDown={(e) => e.preventDefault()}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                e.preventDefault();
+                e.stopPropagation();
+                inputRef.current?.focus();
+                // Focus handlers can reopen the menu: closing must happen last.
+                setShowSuggestions(false);
+              }
+            }}
           >
             <div className="flex items-center justify-between">
               <p className="text-xs font-bold text-neutral">
@@ -132,6 +166,7 @@ export default function SearchBar({ placeholder, fullWidth }: Props) {
                 <button
                   key={entry.operator}
                   type="button"
+                  data-search-operator
                   className="flex items-center gap-2 justify-between rounded-md px-2 py-1 text-left hover:bg-neutral-content duration-100"
                   onClick={() => handleSuggestionClick(entry.operator)}
                 >

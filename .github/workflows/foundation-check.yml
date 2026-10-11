@@ -28,5 +28,5 @@ jobs:
         run: yarn prisma:generate
       - name: Typecheck web application
         run: yarn workspace @linkwarden/web exec tsc --noEmit --pretty false
-      - name: Run focused URL safety and search-history unit tests
-        run: yarn vitest run packages/lib/ssrf.test.ts packages/lib/safeFetch.test.ts apps/web/lib/client/recentSearches.test.ts
+      - name: Run focused URL safety and search-input/history unit tests
+        run: yarn vitest run packages/lib/ssrf.test.ts packages/lib/safeFetch.test.ts apps/web/lib/client/recentSearches.test.ts apps/web/lib/client/searchInput.test.ts
