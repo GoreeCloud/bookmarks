@@ -4,11 +4,18 @@ import { JSDOM } from "jsdom";
 import { decodeHTML } from "entities";
 import { parse, Node, Element, TextNode } from "himalaya";
 import { hasPassedLimit } from "@linkwarden/lib/verifyCapacity";
+import {
+  normalizeImportedBookmarkUrl,
+  parseImportedBookmarkDate,
+} from "./importSafety";
 
 export default async function importFromHTMLFile(
   userId: number,
   rawData: string
 ) {
+  if (typeof rawData !== "string" || !rawData.trim()) {
+    return { response: "Invalid bookmark HTML import.", status: 400 };
+  }
   // const importStartMs = Date.now();
 
   const dom = new JSDOM(rawData);
@@ -19,8 +26,12 @@ export default async function importFromHTMLFile(
   document.querySelectorAll("META").forEach((e) => (e.outerHTML = e.innerHTML));
   document.querySelectorAll("P").forEach((e) => (e.outerHTML = e.innerHTML));
 
+  // Only importable web links count toward the inherited link quota.
+  // Untrusted bookmarklets and file/data URLs must not block safe imports.
   const bookmarks = document.querySelectorAll("A");
-  const totalImports = bookmarks.length;
+  const totalImports = Array.from(bookmarks).filter((bookmark) =>
+    normalizeImportedBookmarkUrl(bookmark.getAttribute("href")) !== null
+  ).length;
 
   const hasTooManyLinks = await hasPassedLimit(userId, totalImports);
 
@@ -88,7 +99,7 @@ async function processBookmarks(
           (e) => e.key.toLowerCase() === "href"
         )?.value;
 
-        const linkUrl = decodeEntities(rawLinkUrl);
+        const linkUrl = normalizeImportedBookmarkUrl(decodeEntities(rawLinkUrl));
 
         const linkName = (
           item?.children.find((e) => e.type === "text") as TextNode
@@ -104,9 +115,7 @@ async function processBookmarks(
           (e) => e.key.toLowerCase() === "add_date"
         )?.value;
 
-        const linkDate = linkDateValue
-          ? new Date(Number(linkDateValue) * 1000)
-          : undefined;
+        const linkDate = parseImportedBookmarkDate(linkDateValue);
 
         let linkDesc =
           (
@@ -206,12 +215,9 @@ const createLink = async (
   tags?: string[],
   importDate?: Date
 ) => {
-  url = url.trim().slice(0, 2047);
-  try {
-    new URL(url);
-  } catch (e) {
-    return;
-  }
+  const normalizedUrl = normalizeImportedBookmarkUrl(url);
+  if (!normalizedUrl) return;
+  url = normalizedUrl;
 
   tags = tags?.map((tag) => tag.trim().slice(0, 49));
   name = name?.trim().slice(0, 254);
