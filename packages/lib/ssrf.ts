@@ -53,11 +53,15 @@ const IPV4_BLOCKED_CIDRS = [
 
 const IPV6_BLOCKED_CIDRS = [
   ["::", 128],
+  ["::", 96],
+  ["::ffff:0:0", 96],
   ["::1", 128],
   ["fc00::", 7],
   ["fe80::", 10],
   ["ff00::", 8],
   ["2001:db8::", 32],
+  ["2001::", 32],
+  ["2002::", 16],
 ] as const;
 
 const IPV4_BLOCKED_RANGES = IPV4_BLOCKED_CIDRS.map(([address, prefix]) => {
@@ -92,7 +96,11 @@ function ipv4Mask(prefixLength: number) {
 }
 
 function normalizeHostname(hostname: string) {
-  return hostname.trim().toLowerCase().replace(/\.+$/, "");
+  return hostname
+    .trim()
+    .toLowerCase()
+    .replace(/\.+$/, "")
+    .replace(/^\[([^\]]+)\]$/, "$1");
 }
 
 function parseIPv4(address: string) {
@@ -133,7 +141,10 @@ function parseIPv6(address: string) {
 
   const hasDoubleColon = normalized.includes("::");
 
-  if (hasDoubleColon && normalized.indexOf("::") !== normalized.lastIndexOf("::"))
+  if (
+    hasDoubleColon &&
+    normalized.indexOf("::") !== normalized.lastIndexOf("::")
+  )
     return null;
 
   const [leftRaw, rightRaw = ""] = hasDoubleColon
@@ -203,7 +214,8 @@ export function isHostnameBlockedForServerSideFetch(hostname: string) {
 
 export function isIpAddressBlockedForServerSideFetch(address: string) {
   const ipv4 =
-    parseIPv4(address) ?? (() => {
+    parseIPv4(address) ??
+    (() => {
       const mapped = extractIPv4FromMappedIPv6(address);
       return mapped ? parseIPv4(mapped) : null;
     })();
@@ -237,9 +249,7 @@ function ipv6MatchesPrefix(
   if (remainingBits === 0) return true;
 
   const mask = (0xffff << (16 - remainingBits)) & 0xffff;
-  return (
-    (address[fullSegments] & mask) === (network[fullSegments] & mask)
-  );
+  return (address[fullSegments] & mask) === (network[fullSegments] & mask);
 }
 
 export const defaultHostnameLookup: HostnameLookup = async (hostname) => {
@@ -270,7 +280,9 @@ export async function resolveHostnameForServerSideFetch(
 
   if (ipFamily === 4 || ipFamily === 6) {
     if (isIpAddressBlockedForServerSideFetch(normalized)) {
-      throw new UnsafeUrlError("URL resolves to a blocked internal IP address.");
+      throw new UnsafeUrlError(
+        "URL resolves to a blocked internal IP address."
+      );
     }
 
     return [{ address: normalized, family: ipFamily }] as const;
@@ -316,10 +328,13 @@ export async function assertUrlIsSafeForServerSideFetch(
     throw new UnsafeUrlError("Only http:// and https:// URLs can be archived.");
   }
 
-  if (
-    options?.allowPrivateNetworkAccess ||
-    process.env.ALLOW_PRIVATE_NETWORK_ACCESS === "true"
-  ) {
+  if (url.username || url.password) {
+    throw new UnsafeUrlError("Embedded URL credentials are not allowed.");
+  }
+
+  // Only a narrow, explicit per-call exception can opt out of public routing.
+  // Environment configuration alone must not weaken untrusted URL validation.
+  if (options?.allowPrivateNetworkAccess) {
     return url;
   }
 

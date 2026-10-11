@@ -101,6 +101,30 @@ export async function safeFetch(
 ): Promise<Response> {
   const { maxRedirects = 5, ...fetchOptions } = options;
 
+  if (process.env.PROXY) {
+    throw new Error(
+      "Untrusted URL proxy routing requires a separately qualified transport."
+    );
+  }
+
+  if (
+    process.env.ALLOW_PRIVATE_NETWORK_ACCESS === "true" ||
+    process.env.ALLOW_INSECURE_TLS === "true" ||
+    process.env.IGNORE_UNAUTHORIZED_CA === "true"
+  ) {
+    throw new Error(
+      "Untrusted URL fetching cannot disable network or TLS protections."
+    );
+  }
+
+  if (
+    !Number.isSafeInteger(maxRedirects) ||
+    maxRedirects < 0 ||
+    maxRedirects > 10
+  ) {
+    throw new TypeError("maxRedirects must be between 0 and 10.");
+  }
+
   let currentUrl = input;
 
   for (let redirectCount = 0; redirectCount <= maxRedirects; redirectCount++) {

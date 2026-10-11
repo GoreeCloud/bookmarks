@@ -12,3 +12,9 @@
 8. **Platform systems:** scope GoreeCloud Identity, Privacy Shield, Wardveil Security, Everkeep, Mesh, Manager, Policy, Observability and Glaze with verified contracts.
 
 There is no authorized production deployment, no completed penetration/security audit, and no blanket acceptance of inherited defaults.
+
+## URL capture security checkpoint — October 11, 2026
+
+The inherited URL validator now rejects embedded credentials and special IPv6 routes. A process-wide private-network override no longer changes the default URL validation. The `safeFetch` path also rejects unqualified proxy or TLS/network protection overrides, and constrains redirect budgets. Existing private-network and proxy deployments may need compatibility redesign.
+
+This limited hardening has 13 locally passing targeted tests. It does not certify the full browser/archive worker, alternative request libraries, redirects, authentication boundaries, upload handling, or production security. The added CI job needs GitHub exact-head verification.
