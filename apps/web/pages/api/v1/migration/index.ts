@@ -7,42 +7,16 @@ import verifyUser from "@/lib/api/verifyUser";
 import importFromWallabag from "@/lib/api/controllers/migration/importFromWallabag";
 import importFromOmnivore from "@/lib/api/controllers/migration/importFromOmnivore";
 import importFromPocket from "@/lib/api/controllers/migration/importFromPocket";
+import {
+  MigrationPayloadError,
+  readBoundedMigrationJson,
+  resolveMigrationLimitMb,
+} from "@/lib/api/controllers/migration/readBoundedMigrationJson";
 
 export const config = {
   api: {
     bodyParser: false,
   },
-};
-
-const parseJsonStream = (
-  req: NextApiRequest,
-  limitMb: number
-): Promise<any> => {
-  return new Promise((resolve, reject) => {
-    const chunks: Buffer[] = [];
-    let totalLength = 0;
-    const limitBytes = limitMb * 1024 * 1024;
-
-    req.on("data", (chunk: Buffer) => {
-      chunks.push(chunk);
-      totalLength += chunk.length;
-
-      if (totalLength > limitBytes) {
-        reject(new Error("Payload Too Large"));
-      }
-    });
-
-    req.on("end", () => {
-      try {
-        const bodyString = Buffer.concat(chunks as any).toString("utf8");
-        resolve(bodyString ? JSON.parse(bodyString) : {});
-      } catch (error) {
-        reject(new Error("Invalid JSON"));
-      }
-    });
-
-    req.on("error", (err) => reject(err));
-  });
 };
 
 export default async function users(req: NextApiRequest, res: NextApiResponse) {
@@ -66,19 +40,32 @@ export default async function users(req: NextApiRequest, res: NextApiResponse) {
       });
 
     let request: MigrationRequest;
+    const limitMb = resolveMigrationLimitMb(process.env.IMPORT_LIMIT);
 
     try {
-      const limitMb = process.env.IMPORT_LIMIT
-        ? parseInt(process.env.IMPORT_LIMIT, 10)
-        : 10;
-
-      request = await parseJsonStream(req, limitMb);
+      const candidate = await readBoundedMigrationJson(
+        req,
+        limitMb * 1024 * 1024
+      );
+      if (
+        !candidate ||
+        typeof candidate !== "object" ||
+        Array.isArray(candidate) ||
+        typeof (candidate as { data?: unknown }).data !== "string" ||
+        !Object.values(MigrationFormat)
+          .filter((value) => typeof value === "number")
+          .includes((candidate as { format?: unknown }).format as number)
+      ) {
+        throw new MigrationPayloadError("invalid");
+      }
+      request = candidate as MigrationRequest;
     } catch (error: any) {
-      if (error.message === "Payload Too Large") {
+      if (
+        error instanceof MigrationPayloadError &&
+        error.code === "too-large"
+      ) {
         return res.status(413).json({
-          response: `Import file exceeds the ${
-            process.env.IMPORT_LIMIT || 10
-          }MB size limit.`,
+          response: `Import file exceeds the ${limitMb}MB size limit.`,
         });
       }
       return res
