@@ -7,41 +7,52 @@ import Modal from "@/components/Modal";
 import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/kbd";
 import { ADVANCED_SEARCH_OPERATORS } from "@/components/SearchBar";
+import {
+  RECENT_SEARCHES_KEY,
+  RecentSearch,
+  addRecentSearch,
+  clearRecentSearches,
+  loadRecentSearches,
+  saveRecentSearches,
+} from "@/lib/client/recentSearches";
 
 export const isAppleDevice =
   typeof navigator !== "undefined" &&
   /Mac|iPhone|iPad|iPod/.test(navigator.platform);
-
-const RECENT_SEARCHES_KEY = "recentSearches";
-const MAX_RECENT_SEARCHES = 5;
-
-type RecentSearch = {
-  query: string;
-  searchedAt: string;
-};
-
-const getRecentSearches = (): RecentSearch[] => {
-  try {
-    const stored = JSON.parse(
-      localStorage.getItem(RECENT_SEARCHES_KEY) || "[]"
-    );
-    if (!Array.isArray(stored)) return [];
-    return stored.filter((entry) => typeof entry?.query === "string");
-  } catch {
-    return [];
-  }
-};
-
-const setRecentSearches = (recents: RecentSearch[]) => {
-  localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(recents));
-};
 
 export default function SearchModal({ onClose }: { onClose: () => void }) {
   const { t } = useTranslation();
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [recents, setRecents] = useState<RecentSearch[]>(getRecentSearches);
+  const [recents, setRecents] = useState<RecentSearch[]>([]);
+
+  useEffect(() => {
+    // Read only after hydration; never render browser storage during SSR.
+    const refresh = () => {
+      try {
+        setRecents(loadRecentSearches(window.localStorage));
+      } catch {
+        setRecents([]);
+      }
+    };
+    refresh();
+
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === RECENT_SEARCHES_KEY || event.key === null) refresh();
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
+
+  const persistRecents = (updated: RecentSearch[]) => {
+    setRecents(updated);
+    try {
+      saveRecentSearches(window.localStorage, updated);
+    } catch {
+      // Browsers may prohibit storage; searching remains functional.
+    }
+  };
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -55,11 +66,7 @@ export default function SearchModal({ onClose }: { onClose: () => void }) {
     const trimmed = query.trim();
     if (!trimmed) return;
 
-    const updated = [
-      { query: trimmed, searchedAt: new Date().toISOString() },
-      ...recents.filter((entry) => entry.query !== trimmed),
-    ].slice(0, MAX_RECENT_SEARCHES);
-    setRecentSearches(updated);
+    persistRecents(addRecentSearch(recents, trimmed));
 
     router.push("/search?q=" + encodeURIComponent(trimmed));
     onClose();
@@ -67,8 +74,17 @@ export default function SearchModal({ onClose }: { onClose: () => void }) {
 
   const removeRecent = (query: string) => {
     const updated = recents.filter((entry) => entry.query !== query);
-    setRecentSearches(updated);
-    setRecents(updated);
+    persistRecents(updated);
+  };
+
+  const clearHistory = () => {
+    setRecents([]);
+    try {
+      clearRecentSearches(window.localStorage);
+    } catch {
+      // Clearing this modal's history remains possible without storage.
+    }
+    inputRef.current?.focus();
   };
 
   const appendOperator = (operator: string) => {
@@ -87,6 +103,8 @@ export default function SearchModal({ onClose }: { onClose: () => void }) {
           type="text"
           ref={inputRef}
           autoFocus
+          autoComplete="off"
+          aria-label={t("search_for_links")}
           placeholder={t("search_for_links")}
           value={searchQuery}
           onChange={(e) => {
@@ -108,27 +126,41 @@ export default function SearchModal({ onClose }: { onClose: () => void }) {
       <div className="sm:max-h-80 sm:overflow-y-auto -mx-4 sm:-mx-5 -mb-4 sm:-mb-5">
         {recents.length > 0 && (
           <div className="px-4 sm:px-5">
-            <p className="text-xs font-bold text-neutral mt-4">{t("recent")}</p>
+            <div className="flex items-center justify-between gap-3 mt-4">
+              <p className="text-xs font-bold text-neutral">{t("recent")}</p>
+              <button
+                type="button"
+                onClick={clearHistory}
+                className="text-xs text-neutral underline underline-offset-2 hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary rounded-sm"
+              >
+                {t("clear_search_history", { defaultValue: "Clear history" })}
+              </button>
+            </div>
             <div className="flex flex-col gap-1 mt-2">
               {recents.map((entry) => (
                 <div
                   key={entry.query}
-                  className="flex items-center gap-3 rounded-md px-2 py-1.5 cursor-pointer hover:bg-base-200 duration-100"
-                  onClick={() => submit(entry.query)}
+                  className="flex items-center gap-2 rounded-md hover:bg-base-200 duration-100"
                 >
-                  <i className="bi-clock-history text-neutral" />
-                  <span className="flex-1 truncate text-sm">{entry.query}</span>
+                  <button
+                    type="button"
+                    className="flex min-w-0 flex-1 items-center gap-3 rounded-md px-2 py-1.5 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+                    onClick={() => submit(entry.query)}
+                  >
+                    <i className="bi-clock-history text-neutral" aria-hidden="true" />
+                    <span className="truncate text-sm">{entry.query}</span>
+                  </button>
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-6 w-6"
-                    aria-label={t("delete")}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      removeRecent(entry.query);
-                    }}
+                    className="h-7 w-7 shrink-0"
+                    aria-label={t("remove_recent_search", {
+                      defaultValue: "Remove recent search: {{query}}",
+                      query: entry.query,
+                    })}
+                    onClick={() => removeRecent(entry.query)}
                   >
-                    <i className="bi-x text-lg text-neutral" />
+                    <i className="bi-x text-lg text-neutral" aria-hidden="true" />
                   </Button>
                 </div>
               ))}
