@@ -9,14 +9,21 @@ export function normalizeImportedBookmarkUrl(
 ): string | null {
   if (typeof input !== "string") return null;
   const url = input.trim();
-  if (!url || url.length > MAX_IMPORTED_URL_LENGTH ||
-      /[\u0000-\u001f\u007f]/.test(url)) {
+  if (
+    !url ||
+    url.length > MAX_IMPORTED_URL_LENGTH ||
+    /[\u0000-\u001f\u007f]/.test(url)
+  ) {
     return null;
   }
   try {
     const parsed = new URL(url);
-    if ((parsed.protocol !== "http:" && parsed.protocol !== "https:") ||
-        !parsed.hostname || parsed.username || parsed.password) {
+    if (
+      (parsed.protocol !== "http:" && parsed.protocol !== "https:") ||
+      !parsed.hostname ||
+      parsed.username ||
+      parsed.password
+    ) {
       return null;
     }
     return url;

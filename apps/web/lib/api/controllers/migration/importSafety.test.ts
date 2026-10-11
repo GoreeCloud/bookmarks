@@ -7,10 +7,12 @@ import {
 
 describe("HTML bookmark import safety", () => {
   it("retains legitimate HTTP(S) bookmarks without rewriting paths or queries", () => {
-    expect(normalizeImportedBookmarkUrl(" https://example.org/a?q=1&b=2 ")).toBe(
-      "https://example.org/a?q=1&b=2"
+    expect(
+      normalizeImportedBookmarkUrl(" https://example.org/a?q=1&b=2 ")
+    ).toBe("https://example.org/a?q=1&b=2");
+    expect(normalizeImportedBookmarkUrl("http://example.org/")).toBe(
+      "http://example.org/"
     );
-    expect(normalizeImportedBookmarkUrl("http://example.org/")).toBe("http://example.org/");
   });
 
   it("rejects scripts, local files, embedded credentials, malformed values and controls", () => {
@@ -38,8 +40,16 @@ describe("HTML bookmark import safety", () => {
       "2023-11-14T22:13:20.000Z"
     );
     expect(parseImportedBookmarkDate("0")?.getTime()).toBe(0);
-    for (const input of ["-1", "1e9", "1700000000.5", "abc", "", "999999999999",
-      "253402300800", "1234567890123"]) {
+    for (const input of [
+      "-1",
+      "1e9",
+      "1700000000.5",
+      "abc",
+      "",
+      "999999999999",
+      "253402300800",
+      "1234567890123",
+    ]) {
       expect(parseImportedBookmarkDate(input)).toBeUndefined();
     }
     expect(parseImportedBookmarkDate(null)).toBeUndefined();

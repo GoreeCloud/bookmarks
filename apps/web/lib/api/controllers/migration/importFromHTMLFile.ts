@@ -29,8 +29,9 @@ export default async function importFromHTMLFile(
   // Only importable web links count toward the inherited link quota.
   // Untrusted bookmarklets and file/data URLs must not block safe imports.
   const bookmarks = document.querySelectorAll("A");
-  const totalImports = Array.from(bookmarks).filter((bookmark) =>
-    normalizeImportedBookmarkUrl(bookmark.getAttribute("href")) !== null
+  const totalImports = Array.from(bookmarks).filter(
+    (bookmark) =>
+      normalizeImportedBookmarkUrl(bookmark.getAttribute("href")) !== null
   ).length;
 
   const hasTooManyLinks = await hasPassedLimit(userId, totalImports);
@@ -99,7 +100,9 @@ async function processBookmarks(
           (e) => e.key.toLowerCase() === "href"
         )?.value;
 
-        const linkUrl = normalizeImportedBookmarkUrl(decodeEntities(rawLinkUrl));
+        const linkUrl = normalizeImportedBookmarkUrl(
+          decodeEntities(rawLinkUrl)
+        );
 
         const linkName = (
           item?.children.find((e) => e.type === "text") as TextNode

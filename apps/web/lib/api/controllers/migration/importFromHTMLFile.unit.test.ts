@@ -33,7 +33,8 @@ describe("HTML import rejects unsafe links before storage", () => {
 <DT><A HREF="https://reader:secret@example.org">Credentials</A>
 <DT><A HREF="https://example.org/good">Good</A></DL>`;
     expect(await importFromHTMLFile(17, html)).toEqual({
-      response: "Success.", status: 200,
+      response: "Success.",
+      status: 200,
     });
     expect(stubs.quota).toHaveBeenCalledWith(17, 1);
     expect(stubs.createLink).toHaveBeenCalledTimes(1);
@@ -47,10 +48,16 @@ describe("HTML import rejects unsafe links before storage", () => {
 <DT><A HREF="https://example.org/b" ADD_DATE="1700000000">Two</A></DL>`;
     expect((await importFromHTMLFile(17, html)).status).toBe(200);
     expect(stubs.createLink).toHaveBeenCalledTimes(2);
-    const first = stubs.createLink.mock.calls[0][0] as { data: { importDate?: Date } };
-    const second = stubs.createLink.mock.calls[1][0] as { data: { importDate?: Date } };
+    const first = stubs.createLink.mock.calls[0][0] as {
+      data: { importDate?: Date };
+    };
+    const second = stubs.createLink.mock.calls[1][0] as {
+      data: { importDate?: Date };
+    };
     expect(first.data.importDate).toBeUndefined();
-    expect(second.data.importDate?.toISOString()).toBe("2023-11-14T22:13:20.000Z");
+    expect(second.data.importDate?.toISOString()).toBe(
+      "2023-11-14T22:13:20.000Z"
+    );
   });
 
   it("rejects non-string and empty payloads without creating collections", async () => {
