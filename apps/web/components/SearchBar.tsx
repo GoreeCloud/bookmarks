@@ -148,9 +148,11 @@ export default function SearchBar({ placeholder, fullWidth }: Props) {
             onMouseDown={(e) => e.preventDefault()}
             onKeyDown={(e) => {
               if (e.key === "Escape") {
+                e.preventDefault();
                 e.stopPropagation();
-                setShowSuggestions(false);
                 inputRef.current?.focus();
+                // Focus handlers can reopen the menu: closing must happen last.
+                setShowSuggestions(false);
               }
             }}
           >
