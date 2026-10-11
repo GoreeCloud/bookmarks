@@ -1,5 +1,4 @@
 import { useEffect, useId, useRef, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/router";
 import { toast } from "react-hot-toast";
 import { useTranslation } from "next-i18next";
@@ -43,11 +42,21 @@ export const ADVANCED_SEARCH_OPERATORS = [
   },
 ] as const;
 
+export const SEARCH_OPERATOR_EXAMPLES = [
+  { labelKey: "url", example: "url:https://example.org/article" },
+  { labelKey: "tag", example: "tag:reading" },
+  { labelKey: "pinned", example: "pinned:true" },
+  { labelKey: "before", example: "before:2026-01-01" },
+  { labelKey: "after", example: "after:2025-01-01" },
+] as const;
+
 export default function SearchBar({ placeholder, fullWidth }: Props) {
   const router = useRouter();
   const { t } = useTranslation();
   const [searchQuery, setSearchQuery] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
+  const helpId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
   const suggestionsId = useId();
@@ -108,9 +117,9 @@ export default function SearchBar({ placeholder, fullWidth }: Props) {
           }
           if (e.key === "ArrowDown" && showSuggestions) {
             e.preventDefault();
-            suggestionsRef.current?.querySelector<HTMLButtonElement>(
-              '[data-search-operator]'
-            )?.focus();
+            suggestionsRef.current
+              ?.querySelector<HTMLButtonElement>("[data-search-operator]")
+              ?.focus();
             return;
           }
           if (e.key === "Enter") {
@@ -183,17 +192,40 @@ export default function SearchBar({ placeholder, fullWidth }: Props) {
               ))}
             </div>
             <div className="flex justify-end">
-              <Button asChild variant="ghost" size="sm" className="text-xs">
-                <Link
-                  href="https://docs.linkwarden.app/usage/advanced-search"
-                  target="_blank"
-                  className="flex items-center gap-1"
-                >
-                  {t("learn_more")}
-                  <i className="bi-box-arrow-up-right text-xs" />
-                </Link>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="text-xs"
+                aria-expanded={showHelp}
+                aria-controls={helpId}
+                onClick={() => setShowHelp((value) => !value)}
+              >
+                {t("learn_more")}
+                <i className="bi-info-circle text-xs" aria-hidden="true" />
               </Button>
             </div>
+
+            {showHelp && (
+              <div
+                id={helpId}
+                role="region"
+                aria-label={t("suggested_search_operators")}
+                className="rounded-md border border-neutral-content bg-base-100 p-2"
+              >
+                <dl className="grid gap-2 text-xs">
+                  {SEARCH_OPERATOR_EXAMPLES.map(({ labelKey, example }) => (
+                    <div
+                      key={example}
+                      className="flex flex-wrap justify-between gap-2"
+                    >
+                      <dt className="text-neutral">{t(labelKey)}</dt>
+                      <dd className="font-mono text-base-content">{example}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+            )}
 
             {/* {user?.hasUnIndexedLinks && !dismissSearchNote ? (
               <div
