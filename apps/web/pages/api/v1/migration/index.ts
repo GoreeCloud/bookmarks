@@ -50,6 +50,8 @@ export default async function users(req: NextApiRequest, res: NextApiResponse) {
   if (!user) return;
 
   if (req.method === "GET") {
+    res.setHeader("Cache-Control", "private, no-store");
+    res.setHeader("X-Content-Type-Options", "nosniff");
     const data = await exportData(user.id);
 
     if (data.status === 200)
