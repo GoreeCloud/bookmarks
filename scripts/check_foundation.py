@@ -41,6 +41,14 @@ class FoundationTests(unittest.TestCase):
         self.assertIn('[data-theme="dark"]',css)
         self.assertIn('[data-theme="light"]',css)
 
+    def test_search_operator_help_stays_inside_bookmarks(self):
+        search=(ROOT/"apps/web/components/SearchBar.tsx").read_text()
+        self.assertNotIn("docs.linkwarden.app/usage/advanced-search", search)
+        self.assertIn('aria-expanded={showHelp}', search)
+        self.assertIn('aria-controls={helpId}', search)
+        self.assertIn('SEARCH_OPERATOR_EXAMPLES.map', search)
+        self.assertIn('role="region"', search)
+
     def test_external_publishing_workflows_contained(self):
         active={p.name for p in (ROOT/".github/workflows").glob("*.yml")}
         self.assertEqual(active,{"foundation-check.yml"})
