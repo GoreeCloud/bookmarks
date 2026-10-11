@@ -117,9 +117,9 @@ export default function SearchBar({ placeholder, fullWidth }: Props) {
           }
           if (e.key === "ArrowDown" && showSuggestions) {
             e.preventDefault();
-            suggestionsRef.current?.querySelector<HTMLButtonElement>(
-              '[data-search-operator]'
-            )?.focus();
+            suggestionsRef.current
+              ?.querySelector<HTMLButtonElement>("[data-search-operator]")
+              ?.focus();
             return;
           }
           if (e.key === "Enter") {
@@ -215,7 +215,10 @@ export default function SearchBar({ placeholder, fullWidth }: Props) {
               >
                 <dl className="grid gap-2 text-xs">
                   {SEARCH_OPERATOR_EXAMPLES.map(({ labelKey, example }) => (
-                    <div key={example} className="flex flex-wrap justify-between gap-2">
+                    <div
+                      key={example}
+                      className="flex flex-wrap justify-between gap-2"
+                    >
                       <dt className="text-neutral">{t(labelKey)}</dt>
                       <dd className="font-mono text-base-content">{example}</dd>
                     </div>
