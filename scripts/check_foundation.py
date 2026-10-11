@@ -41,6 +41,15 @@ class FoundationTests(unittest.TestCase):
         self.assertIn('[data-theme="dark"]',css)
         self.assertIn('[data-theme="light"]',css)
 
+    def test_sidebar_toggle_controls_and_mobile_dismissal(self):
+        shell=(ROOT/"apps/web/components/SidebarShell.tsx").read_text()
+        self.assertIn('aria-label={collapsed ? t("expand_sidebar") : t("shrink_sidebar")}', shell)
+        self.assertIn('aria-expanded={!collapsed}', shell)
+        self.assertIn('aria-controls="sidebar"', shell)
+        self.assertIn('if (event.key === "Escape") setMobileExpanded(false)', shell)
+        self.assertIn('document.removeEventListener("keydown", dismissOnEscape)', shell)
+        self.assertIn('<button\n            type="button"\n            aria-label={t("shrink_sidebar")}', shell)
+
     def test_external_publishing_workflows_contained(self):
         active={p.name for p in (ROOT/".github/workflows").glob("*.yml")}
         self.assertEqual(active,{"foundation-check.yml"})

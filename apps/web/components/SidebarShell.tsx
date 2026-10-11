@@ -84,6 +84,15 @@ export default function SidebarShell({
     setMobileExpanded(false);
   }, [router.asPath]);
 
+  useEffect(() => {
+    if (!isMobile || !mobileExpanded) return;
+    const dismissOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMobileExpanded(false);
+    };
+    document.addEventListener("keydown", dismissOnEscape);
+    return () => document.removeEventListener("keydown", dismissOnEscape);
+  }, [isMobile, mobileExpanded]);
+
   const collapsed = isMobile ? !mobileExpanded : sidebarIsCollapsed;
   const toggle = isMobile
     ? () => setMobileExpanded(!mobileExpanded)
@@ -94,7 +103,9 @@ export default function SidebarShell({
       {isMobile && mobileExpanded && (
         <>
           <div className="w-14 shrink-0" />
-          <div
+          <button
+            type="button"
+            aria-label={t("shrink_sidebar")}
             className="fixed inset-0 bg-black bg-opacity-10 backdrop-blur-sm z-30 fade-in"
             onClick={() => setMobileExpanded(false)}
           />
@@ -158,8 +169,15 @@ export default function SidebarShell({
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant="ghost" onClick={toggle} size="icon">
-                    <i className="bi-layout-sidebar" />
+                  <Button
+                    variant="ghost"
+                    onClick={toggle}
+                    size="icon"
+                    aria-label={collapsed ? t("expand_sidebar") : t("shrink_sidebar")}
+                    aria-expanded={!collapsed}
+                    aria-controls="sidebar"
+                  >
+                    <i className="bi-layout-sidebar" aria-hidden="true" />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side={collapsed ? "right" : "top"}>
