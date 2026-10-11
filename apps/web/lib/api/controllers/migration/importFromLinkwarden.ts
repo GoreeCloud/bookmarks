@@ -1,6 +1,6 @@
 import { prisma } from "@linkwarden/prisma";
 import type { Backup } from "@linkwarden/types/global";
-import { createFolder } from "@linkwarden/filesystem";
+import { ensureOwnedArchiveFolders } from "./ensureOwnedArchiveFolders";
 import { hasPassedLimit } from "@linkwarden/lib/verifyCapacity";
 import { normalizeImportedBookmarkUrl } from "./importSafety";
 
@@ -140,9 +140,14 @@ export default async function importFromLinkwarden(
     };
   }
   try {
-    // Filesystem changes happen only after a successful database commit.
-    for (const id of collectionIds) {
-      await createFolder({ filePath: `archives/${id}` });
+    // Database changes are already committed. Verify ownership before
+    // creating any archive directories; repeated repair is idempotent.
+    const repair = await ensureOwnedArchiveFolders(userId, collectionIds);
+    if (repair.status !== "complete") {
+      return {
+        response: "Bookmarks saved, but archive directories need repair.",
+        status: 500,
+      };
     }
   } catch {
     return {

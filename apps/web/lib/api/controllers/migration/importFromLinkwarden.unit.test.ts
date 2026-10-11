@@ -4,20 +4,20 @@ const stubs = vi.hoisted(() => {
   const collectionCreate = vi.fn(async () => ({ id: 71 }));
   const linkCreate = vi.fn(async (_input: unknown) => ({ id: 82 }));
   const quota = vi.fn(async () => false);
-  const createFolder = vi.fn(async () => undefined);
+  const repairFolders = vi.fn(async (_owner: number, _ids: number[]) => ({ status: "complete", ensured: 1, failedIds: [] as number[] }));
   const transaction = vi.fn(async (fn: (tx: unknown) => Promise<unknown>) =>
     fn({
       collection: { create: collectionCreate },
       link: { create: linkCreate },
     })
   );
-  return { collectionCreate, linkCreate, transaction, quota, createFolder };
+  return { collectionCreate, linkCreate, transaction, quota, repairFolders };
 });
 vi.mock("@linkwarden/prisma", () => ({
   prisma: { $transaction: stubs.transaction },
 }));
-vi.mock("@linkwarden/filesystem", () => ({
-  createFolder: stubs.createFolder,
+vi.mock("./ensureOwnedArchiveFolders", () => ({
+  ensureOwnedArchiveFolders: stubs.repairFolders,
 }));
 vi.mock("@linkwarden/lib/verifyCapacity", () => ({
   hasPassedLimit: stubs.quota,
@@ -66,9 +66,7 @@ describe("Linkwarden-compatible JSON backup import", () => {
         pinnedBy: { connect: { id: 17 } },
       },
     });
-    expect(stubs.createFolder).toHaveBeenCalledWith({
-      filePath: "archives/71",
-    });
+    expect(stubs.repairFolders).toHaveBeenCalledWith(17, [71]);
   });
 
   it("rejects malformed backups without database or filesystem changes", async () => {
@@ -76,7 +74,7 @@ describe("Linkwarden-compatible JSON backup import", () => {
       expect((await importFromLinkwarden(17, input)).status).toBe(400);
     }
     expect(stubs.transaction).not.toHaveBeenCalled();
-    expect(stubs.createFolder).not.toHaveBeenCalled();
+    expect(stubs.repairFolders).not.toHaveBeenCalled();
   });
 
   it("reports a failed transaction without claiming success or creating folders", async () => {
@@ -87,7 +85,7 @@ describe("Linkwarden-compatible JSON backup import", () => {
         status: 500,
       }
     );
-    expect(stubs.createFolder).not.toHaveBeenCalled();
+    expect(stubs.repairFolders).not.toHaveBeenCalled();
   });
 
   it("rejects quota violations before any transaction", async () => {
@@ -99,7 +97,7 @@ describe("Linkwarden-compatible JSON backup import", () => {
   });
 
   it("reports archive setup failures separately from already committed links", async () => {
-    stubs.createFolder.mockRejectedValueOnce(new Error("storage unavailable"));
+    stubs.repairFolders.mockResolvedValueOnce({ status: "partial", ensured: 0, failedIds: [71] });
     expect(await importFromLinkwarden(17, JSON.stringify(validBackup))).toEqual(
       {
         response: "Bookmarks saved, but archive directories need repair.",
