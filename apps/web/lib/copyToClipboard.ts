@@ -8,6 +8,9 @@ export function fallbackCopyTextToClipboard(text: string): boolean {
   textArea.style.opacity = "0";
   textArea.style.pointerEvents = "none";
 
+  // Legacy execCommand requires a focused selection. Restore the user's
+  // previous focus even if the browser denies copying or throws.
+  const previouslyFocused = document.activeElement;
   document.body.appendChild(textArea);
   textArea.focus();
   textArea.select();
@@ -20,6 +23,9 @@ export function fallbackCopyTextToClipboard(text: string): boolean {
     return false;
   } finally {
     textArea.remove();
+    if (previouslyFocused instanceof HTMLElement && previouslyFocused.isConnected) {
+      previouslyFocused.focus({ preventScroll: true });
+    }
   }
 }
 
