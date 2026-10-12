@@ -10,7 +10,6 @@ import {
   isPreservationPending,
 } from "@linkwarden/lib/formatStats";
 import PreservedFormatRow from "@/components/PreserverdFormatRow";
-import getPublicUserData from "@/lib/client/getPublicUserData";
 import { useTranslation } from "next-i18next";
 import { BeatLoader } from "react-spinners";
 import { useUser } from "@linkwarden/router/user";
@@ -74,38 +73,8 @@ export default function LinkDetails({
 
   const isPublicRoute = router.pathname.startsWith("/public") ? true : false;
 
-  const [collectionOwner, setCollectionOwner] = useState({
-    id: null as unknown as number,
-    name: "",
-    username: "",
-    image: "",
-    archiveAsScreenshot: undefined as unknown as boolean,
-    archiveAsMonolith: undefined as unknown as boolean,
-    archiveAsPDF: undefined as unknown as boolean,
-  });
-
-  useEffect(() => {
-    const fetchOwner = async () => {
-      if (link.collection.ownerId !== user?.id) {
-        const owner = await getPublicUserData(
-          link.collection.ownerId as number
-        );
-        setCollectionOwner(owner);
-      } else if (link.collection.ownerId === user?.id) {
-        setCollectionOwner({
-          id: user?.id as number,
-          name: user?.name as string,
-          username: user?.username as string,
-          image: user?.image as string,
-          archiveAsScreenshot: user?.archiveAsScreenshot as boolean,
-          archiveAsMonolith: user?.archiveAsScreenshot as boolean,
-          archiveAsPDF: user?.archiveAsPDF as boolean,
-        });
-      }
-    };
-
-    fetchOwner();
-  }, [link.collection.ownerId]);
+  // Owner details are shown by the appropriate collection UI. Avoid an
+  // unused per-link profile request (including while the viewer loads).
 
   const isReady = () => Boolean(link?.id) && !isPreservationPending(link);
 
