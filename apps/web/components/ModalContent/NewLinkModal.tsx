@@ -138,7 +138,7 @@ export default function NewLinkModal({ onClose }: Props) {
           {link.collection?.name && (
             <CollectionSelection
               onChange={setCollection}
-              defaultValue={{
+              selectedValue={{
                 value: link.collection?.id,
                 label: link.collection?.name || "Unorganized",
               }}
