@@ -3,6 +3,8 @@ import CollectionSelection from "@/components/InputSelect/CollectionSelection";
 import TagSelection from "@/components/InputSelect/TagSelection";
 import TextInput from "@/components/TextInput";
 import unescapeString from "@/lib/client/unescapeString";
+import persistBeforeClose from "@/lib/client/persistBeforeClose";
+import resolveQuickSaveCollection from "@/lib/client/resolveQuickSaveCollection";
 import { useRouter } from "next/router";
 import Modal from "../Modal";
 import { useTranslation } from "next-i18next";
@@ -42,50 +44,65 @@ export default function NewLinkModal({ onClose }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [link, setLink] = useState<PostLinkSchemaType>(initial);
   const [optionsExpanded, setOptionsExpanded] = useState(false);
+  const submittingRef = useRef(false);
+  const [submitting, setSubmitting] = useState(false);
   const router = useRouter();
-  const { data: collections = [] } = useCollections();
+  const { data: collections = [], isFetched, isError } = useCollections();
+  const initialCollectionResolved = useRef(false);
+  const manuallySelectedCollection = useRef(false);
 
   const setCollection = (e: any) => {
-    if (e?.__isNew__) e.value = undefined;
-    setLink({
-      ...link,
-      collection: { id: e?.value, name: e?.label },
-    });
+    manuallySelectedCollection.current = true;
+    setLink((previous) => ({
+      ...previous,
+      collection: {
+        id: e?.__isNew__ ? undefined : e?.value,
+        name: e?.label || "Unorganized",
+      },
+    }));
   };
 
   const setTags = (selectedOptions: any = []) => {
     const tagNames = selectedOptions.map((option: any) => ({
       name: option.label,
     }));
-    setLink({ ...link, tags: tagNames });
+    setLink((previous) => ({ ...previous, tags: tagNames }));
   };
 
   useEffect(() => {
-    if (router.pathname.startsWith("/collections/") && router.query.id) {
-      const currentCollection = collections.find(
-        (e) => e.id == Number(router.query.id)
-      );
+    if (initialCollectionResolved.current || !router.isReady) return;
 
-      if (currentCollection && currentCollection.ownerId)
-        setLink({
-          ...initial,
-          collection: {
-            id: currentCollection.id,
-            name: currentCollection.name,
-          },
-        });
-    } else
-      setLink({
-        ...initial,
-        collection: { name: "Unorganized" },
-      });
-  }, []);
+    // Do not resolve collection context before the collection query settles.
+    if (router.pathname.startsWith("/collections/") && !isFetched && !isError)
+      return;
+
+    initialCollectionResolved.current = true;
+    if (manuallySelectedCollection.current) return;
+    const collection = resolveQuickSaveCollection(
+      router.pathname,
+      router.query.id,
+      collections
+    );
+
+    // Preserve URL, notes and tags entered while the query was loading.
+    setLink((previous) => ({ ...previous, collection }));
+  }, [
+    router.isReady,
+    router.pathname,
+    router.query.id,
+    collections,
+    isFetched,
+    isError,
+  ]);
 
   useLayoutEffect(() => {
     inputRef.current?.focus();
   }, []);
 
   const submit = async () => {
+    // A synchronous guard also prevents a second click before React rerenders.
+    if (submittingRef.current) return;
+
     const dataValidation = PostLinkSchema.safeParse(link);
 
     if (!dataValidation.success)
@@ -95,12 +112,24 @@ export default function NewLinkModal({ onClose }: Props) {
         } [${dataValidation.error.issues[0].path.join(", ")}]`
       );
 
-    addLink.mutateAsync(link);
-    onClose();
+    submittingRef.current = true;
+    setSubmitting(true);
+    try {
+      // The mutation hook displays errors and rolls back optimistic updates.
+      // Keep the entered bookmark visible if persistence fails.
+      await persistBeforeClose(
+        link,
+        (value) => addLink.mutateAsync(value),
+        onClose
+      );
+    } finally {
+      submittingRef.current = false;
+      setSubmitting(false);
+    }
   };
 
   return (
-    <Modal toggleModal={onClose}>
+    <Modal toggleModal={onClose} dismissible={!submitting}>
       <p className="text-xl font-thin">{t("create_new_link")}</p>
 
       <Separator className="my-3" />
@@ -111,7 +140,9 @@ export default function NewLinkModal({ onClose }: Props) {
           <TextInput
             ref={inputRef}
             value={link.url || ""}
-            onChange={(e) => setLink({ ...link, url: e.target.value })}
+            onChange={(e) =>
+              setLink((previous) => ({ ...previous, url: e.target.value }))
+            }
             placeholder={t("link_url_placeholder")}
             className="bg-base-200"
           />
@@ -121,7 +152,7 @@ export default function NewLinkModal({ onClose }: Props) {
           {link.collection?.name && (
             <CollectionSelection
               onChange={setCollection}
-              defaultValue={{
+              selectedValue={{
                 value: link.collection?.id,
                 label: link.collection?.name || "Unorganized",
               }}
@@ -135,7 +166,9 @@ export default function NewLinkModal({ onClose }: Props) {
             <p className="mb-2">{t("name")}</p>
             <TextInput
               value={link.name}
-              onChange={(e) => setLink({ ...link, name: e.target.value })}
+              onChange={(e) =>
+                setLink((previous) => ({ ...previous, name: e.target.value }))
+              }
               placeholder={t("link_name_placeholder")}
               className="bg-base-200"
             />
@@ -154,7 +187,10 @@ export default function NewLinkModal({ onClose }: Props) {
             <textarea
               value={unescapeString(link.description || "") || ""}
               onChange={(e) =>
-                setLink({ ...link, description: e.target.value })
+                setLink((previous) => ({
+                  ...previous,
+                  description: e.target.value,
+                }))
               }
               placeholder={t("link_description_placeholder")}
               className="resize-none w-full h-32 rounded-md p-2 border-neutral-content bg-base-200 focus:border-primary border-solid border outline-none duration-100"
@@ -172,8 +208,8 @@ export default function NewLinkModal({ onClose }: Props) {
           <p>{optionsExpanded ? t("hide_options") : t("more_options")}</p>
           <i className={`bi-chevron-${optionsExpanded ? "up" : "down"}`} />
         </Button>
-        <Button variant="primary" onClick={submit}>
-          {t("create_link")}
+        <Button variant="primary" onClick={submit} disabled={submitting}>
+          {submitting ? t("creating") : t("create_link")}
         </Button>
       </div>
     </Modal>

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   LinkIncludingShortenedCollectionAndTags,
   ArchivedFormat,
@@ -10,7 +10,6 @@ import {
   isPreservationPending,
 } from "@linkwarden/lib/formatStats";
 import PreservedFormatRow from "@/components/PreserverdFormatRow";
-import getPublicUserData from "@/lib/client/getPublicUserData";
 import { useTranslation } from "next-i18next";
 import { BeatLoader } from "react-spinners";
 import { useUser } from "@linkwarden/router/user";
@@ -26,6 +25,8 @@ import toast from "react-hot-toast";
 import CollectionSelection from "./InputSelect/CollectionSelection";
 import TagSelection from "./InputSelect/TagSelection";
 import unescapeString from "@/lib/client/unescapeString";
+import safeExternalUrl from "@/lib/client/safeExternalUrl";
+import persistBeforeClose from "@/lib/client/persistBeforeClose";
 import IconPopover from "./IconPopover";
 import TextInput from "./TextInput";
 import usePermissions from "@/hooks/usePermissions";
@@ -63,6 +64,7 @@ export default function LinkDetails({
     setLink(activeLink);
   }, [activeLink]);
 
+  const externalUrl = safeExternalUrl(link.url);
   const permissions = usePermissions(link.collection.id as number);
 
   const { t } = useTranslation();
@@ -71,46 +73,19 @@ export default function LinkDetails({
 
   const isPublicRoute = router.pathname.startsWith("/public") ? true : false;
 
-  const [collectionOwner, setCollectionOwner] = useState({
-    id: null as unknown as number,
-    name: "",
-    username: "",
-    image: "",
-    archiveAsScreenshot: undefined as unknown as boolean,
-    archiveAsMonolith: undefined as unknown as boolean,
-    archiveAsPDF: undefined as unknown as boolean,
-  });
-
-  useEffect(() => {
-    const fetchOwner = async () => {
-      if (link.collection.ownerId !== user?.id) {
-        const owner = await getPublicUserData(
-          link.collection.ownerId as number
-        );
-        setCollectionOwner(owner);
-      } else if (link.collection.ownerId === user?.id) {
-        setCollectionOwner({
-          id: user?.id as number,
-          name: user?.name as string,
-          username: user?.username as string,
-          image: user?.image as string,
-          archiveAsScreenshot: user?.archiveAsScreenshot as boolean,
-          archiveAsMonolith: user?.archiveAsScreenshot as boolean,
-          archiveAsPDF: user?.archiveAsPDF as boolean,
-        });
-      }
-    };
-
-    fetchOwner();
-  }, [link.collection.ownerId]);
+  // Owner details are shown by the appropriate collection UI. Avoid an
+  // unused per-link profile request (including while the viewer loads).
 
   const isReady = () => Boolean(link?.id) && !isPreservationPending(link);
 
   const updateLink = useUpdateLink({ toast, t });
   const updateFile = useUpdateFile();
+  const savingRef = useRef(false);
+  const [saving, setSaving] = useState(false);
 
   const submit = async (e?: any) => {
     e?.preventDefault();
+    if (savingRef.current) return;
 
     const { updatedAt: b, ...oldLink } = activeLink;
     const { updatedAt: a, ...newLink } = link;
@@ -119,9 +94,20 @@ export default function LinkDetails({
       return;
     }
 
-    updateLink.mutateAsync(link);
-
-    setMode && setMode("view");
+    // Preserve the edited fields and let the mutation hook report errors if
+    // persistence fails; the editor must not disappear before a confirmed save.
+    savingRef.current = true;
+    setSaving(true);
+    try {
+      await persistBeforeClose(
+        link,
+        (value) => updateLink.mutateAsync(value),
+        () => setMode && setMode("view")
+      );
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
+    }
   };
 
   const setCollection = (e: any) => {
@@ -311,9 +297,18 @@ export default function LinkDetails({
 
               <div className="relative">
                 <div className="rounded-md p-2 bg-base-200 hide-scrollbar overflow-x-auto whitespace-nowrap flex justify-between items-center gap-2 pr-14">
-                  <Link href={link.url} title={link.url} target="_blank">
-                    {link.url}
-                  </Link>
+                  {externalUrl ? (
+                    <Link
+                      href={externalUrl}
+                      title={link.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {link.url}
+                    </Link>
+                  ) : (
+                    <span className="text-neutral">{link.url}</span>
+                  )}
                   <div className="absolute right-0 px-2 bg-base-200">
                     <CopyButton text={link.url} />
                   </div>
@@ -629,10 +624,11 @@ export default function LinkDetails({
               <div className="flex justify-end items-center">
                 <Button
                   variant="primary"
-                  disabled={JSON.stringify(activeLink) === JSON.stringify(link)}
+                  disabled={saving || JSON.stringify(activeLink) === JSON.stringify(link)}
+                  aria-busy={saving}
                   onClick={submit}
                 >
-                  {t("save_changes")}
+                  {saving ? t("updating") : t("save_changes")}
                 </Button>
               </div>
             </>

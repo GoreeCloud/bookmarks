@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useRef, useState } from "react";
 import useLinkStore from "@/store/links";
 import Modal from "../Modal";
 import { Button } from "@/components/ui/button";
@@ -8,36 +8,55 @@ import toast from "react-hot-toast";
 import { Separator } from "../ui/separator";
 
 type Props = {
-  onClose: Function;
+  onClose: () => void;
+  selectedLinkIds: number[];
 };
 
-export default function BulkDeleteLinksModal({ onClose }: Props) {
+export default function BulkDeleteLinksModal({
+  onClose,
+  selectedLinkIds,
+}: Props) {
   const { t } = useTranslation();
-  const { selectedIds, clearSelected, selectionCount } = useLinkStore();
+  const { clearSelected } = useLinkStore();
+  const selectionCount = selectedLinkIds.length;
+  const deletingRef = useRef(false);
+  const [deleting, setDeleting] = useState(false);
 
   const deleteLinksById = useBulkDeleteLinks();
 
   const deleteLink = async () => {
+    // Guard synchronously against two destructive requests before React renders.
+    if (deletingRef.current || selectedLinkIds.length === 0) return;
+    deletingRef.current = true;
+    setDeleting(true);
+
+    const ids = [...selectedLinkIds];
     const load = toast.loading(t("deleting"));
-    const ids = Object.keys(selectedIds).map(Number);
+    let succeeded = false;
+    try {
+      await deleteLinksById.mutateAsync(ids);
+      succeeded = true;
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : t("delete_failed", { defaultValue: "Unable to delete bookmarks" })
+      );
+    } finally {
+      toast.dismiss(load);
+      deletingRef.current = false;
+      setDeleting(false);
+    }
 
-    await deleteLinksById.mutateAsync(ids, {
-      onSettled: (data, error) => {
-        toast.dismiss(load);
-
-        if (error) {
-          toast.error(error.message);
-        } else {
-          clearSelected();
-          onClose();
-          toast.success(t("deleted"));
-        }
-      },
-    });
+    if (succeeded) {
+      clearSelected();
+      onClose();
+      toast.success(t("deleted"));
+    }
   };
 
   return (
-    <Modal toggleModal={onClose}>
+    <Modal toggleModal={onClose} dismissible={!deleting}>
       <p className="text-xl font-thin text-red-500">
         {selectionCount === 1
           ? t("delete_link")
@@ -60,9 +79,12 @@ export default function BulkDeleteLinksModal({ onClose }: Props) {
           <span>{t("warning_irreversible")}</span>
         </div>
 
-        <p>{t("shift_key_tip")}</p>
-
-        <Button className="ml-auto" variant="destructive" onClick={deleteLink}>
+        <Button
+          className="ml-auto"
+          variant="destructive"
+          onClick={deleteLink}
+          disabled={deleting || selectionCount === 0}
+        >
           <i className="bi-trash text-xl" />
           {t("delete")}
         </Button>
