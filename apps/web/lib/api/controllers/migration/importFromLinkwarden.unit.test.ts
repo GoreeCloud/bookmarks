@@ -77,6 +77,29 @@ describe("Linkwarden-compatible JSON backup import", () => {
     expect(stubs.repairFolders).not.toHaveBeenCalled();
   });
 
+  it("rejects incompatible legacy backup field types before quota or writes", async () => {
+    const invalid = [
+      { collections: [{ name: "A", description: 123, links: [] }] },
+      { collections: [{ name: "A", color: {}, links: [] }] },
+      { collections: [{ name: "A", links: [{ name: 42, tags: [] }] }] },
+      { collections: [{ name: "A", links: [{ url: "https://example.org", description: 22, tags: [] }] }] },
+      { collections: [{ name: "A", links: [{ url: {}, tags: [] }] }] },
+      { collections: [{ name: "A", links: [{ url: null, tags: [{ name: false }] }] }] },
+      { collections: [], pinnedLinks: [null] },
+      { collections: [], pinnedLinks: [{ url: {} }] },
+      { collections: [], pinnedLinks: ["not-a-pin"] },
+    ];
+    for (const backup of invalid) {
+      expect(await importFromLinkwarden(17, JSON.stringify(backup))).toEqual({
+        response: "Invalid bookmark backup structure.",
+        status: 400,
+      });
+    }
+    expect(stubs.quota).not.toHaveBeenCalled();
+    expect(stubs.transaction).not.toHaveBeenCalled();
+    expect(stubs.repairFolders).not.toHaveBeenCalled();
+  });
+
   it("reports a failed transaction without claiming success or creating folders", async () => {
     stubs.transaction.mockRejectedValueOnce(new Error("constraint rejected"));
     expect(await importFromLinkwarden(17, JSON.stringify(validBackup))).toEqual(
