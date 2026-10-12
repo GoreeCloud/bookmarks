@@ -58,6 +58,23 @@ describe("copyToClipboard", () => {
     expect(execCommand).toHaveBeenCalledWith("copy");
   });
 
+  it("returns false and removes temporary DOM when execCommand throws", async () => {
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: undefined,
+    });
+    const execCommand = vi.fn(() => {
+      throw new Error("permission denied");
+    });
+    Object.defineProperty(document, "execCommand", {
+      configurable: true,
+      value: execCommand,
+    });
+
+    await expect(copyTextToClipboard("private-value")).resolves.toBe(false);
+    expect(document.querySelector("textarea")).toBeNull();
+  });
+
   it("cleans up the temporary textarea used by the fallback", () => {
     const execCommand = mockExecCommand(true);
 
