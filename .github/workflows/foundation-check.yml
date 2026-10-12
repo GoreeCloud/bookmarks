@@ -29,4 +29,4 @@ jobs:
       - name: Typecheck web application
         run: yarn workspace @linkwarden/web exec tsc --noEmit --pretty false
       - name: Run focused URL safety unit tests
-        run: yarn vitest run packages/lib/ssrf.test.ts packages/lib/safeFetch.test.ts
+        run: yarn vitest run packages/lib/ssrf.test.ts packages/lib/safeFetch.test.ts apps/web/lib/client/persistBeforeClose.test.ts apps/web/lib/client/resolveQuickSaveCollection.test.ts apps/web/components/InputSelect/CollectionSelection.test.tsx apps/web/lib/client/confirmDeletePersistence.test.ts apps/web/lib/client/confirmActionBeforeClose.test.ts apps/web/lib/client/safeExternalUrl.test.ts apps/web/lib/client/visibleBookmarkSelection.test.ts apps/web/lib/copyToClipboard.test.ts
