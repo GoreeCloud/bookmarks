@@ -9,13 +9,17 @@ vi.mock("@linkwarden/router/collections", () => ({
   useCollections: () => ({ data: [] }),
 }));
 vi.mock("react-select/creatable", () => ({
-  default: ({ value, defaultValue }: {
+  default: ({
+    value,
+    defaultValue,
+  }: {
     value?: { label: string };
     defaultValue?: { label: string };
-  }) => React.createElement("output", {
-    "data-selected": value?.label ?? "uncontrolled",
-    "data-default": defaultValue?.label ?? "empty",
-  }),
+  }) =>
+    React.createElement("output", {
+      "data-selected": value?.label ?? "uncontrolled",
+      "data-default": defaultValue?.label ?? "empty",
+    }),
 }));
 vi.mock("react-select", () => ({
   default: ({ value }: { value?: { label: string } }) =>
