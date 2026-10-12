@@ -79,6 +79,28 @@ describe.sequential("disposable PostgreSQL bookmark restore", () => {
       .toBe("complete");
   });
 
+  it("rolls back earlier writes if a later PostgreSQL tag write fails", async () => {
+    const user = await newTestUser();
+    const backup = {
+      collections: [{
+        name: "Rollback Case",
+        links: [
+          { name: "First", url: "https://example.org/first", tags: [] },
+          { name: "Second", url: "https://example.org/second",
+            tags: [{ name: "invalid" + String.fromCharCode(0) + "tag" }] },
+        ],
+      }],
+      pinnedLinks: [],
+    };
+    const outcome = await importFromLinkwarden(user.id, JSON.stringify(backup));
+    expect(outcome.status).toBe(500);
+    expect(await prisma.collection.count({
+      where: { ownerId: user.id, name: "Rollback Case" },
+    })).toBe(0);
+    expect(await prisma.link.count({ where: { createdById: user.id } }))
+      .toBe(0);
+  });
+
   it("refuses other users' collections before writing directories", async () => {
     const owner = await newTestUser();
     const other = await newTestUser();
