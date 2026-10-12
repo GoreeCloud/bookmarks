@@ -19,7 +19,14 @@ async function newTestUser() {
 
 beforeAll(async () => {
   // Do not connect to any database until every isolation boundary is verified.
-  if (!isDisposableBookmarkTestTarget(process.env)) {
+  if (!isDisposableBookmarkTestTarget({
+    DATABASE_URL: process.env.DATABASE_URL,
+    STORAGE_FOLDER: process.env.STORAGE_FOLDER,
+    GOREECLOUD_DISPOSABLE_DB_TEST: process.env.GOREECLOUD_DISPOSABLE_DB_TEST,
+    SPACES_ENDPOINT: process.env.SPACES_ENDPOINT,
+    SPACES_KEY: process.env.SPACES_KEY,
+    SPACES_SECRET: process.env.SPACES_SECRET,
+  })) {
     throw new Error("Isolated local test database and explicit opt-in required.");
   }
   await prisma.$connect();
