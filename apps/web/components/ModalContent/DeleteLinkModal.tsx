@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useRef, useState } from "react";
 import { LinkIncludingShortenedCollectionAndTags } from "@linkwarden/types/global";
 import Modal from "../Modal";
 import { useRouter } from "next/router";
@@ -7,6 +7,7 @@ import { useTranslation } from "next-i18next";
 import { useDeleteLink } from "@linkwarden/router/links";
 import toast from "react-hot-toast";
 import { Separator } from "../ui/separator";
+import confirmDeletePersistence from "@/lib/client/confirmDeletePersistence";
 
 type Props = {
   onClose: Function;
@@ -15,26 +16,33 @@ type Props = {
 
 export default function DeleteLinkModal({ onClose, activeLink }: Props) {
   const { t } = useTranslation();
-  const [link, setLink] =
-    useState<LinkIncludingShortenedCollectionAndTags>(activeLink);
+  const deletingRef = useRef(false);
+  const [deleting, setDeleting] = useState(false);
 
   const deleteLink = useDeleteLink({ toast, t });
   const router = useRouter();
 
-  useEffect(() => {
-    setLink(activeLink);
-  }, []);
-
   const submit = async () => {
-    deleteLink.mutateAsync(link.id as number);
-
-    if (
-      router.pathname.startsWith("/links/[id]") ||
-      router.pathname.startsWith("/preserved/[id]")
-    ) {
-      router.push("/dashboard");
+    if (deletingRef.current || !Number.isSafeInteger(activeLink.id) || !activeLink.id) return;
+    deletingRef.current = true;
+    setDeleting(true);
+    try {
+      await confirmDeletePersistence(
+        () => deleteLink.mutateAsync(activeLink.id as number),
+        () => {
+          onClose();
+          if (
+            router.pathname.startsWith("/links/[id]") ||
+            router.pathname.startsWith("/preserved/[id]")
+          ) {
+            void router.push("/dashboard");
+          }
+        }
+      );
+    } finally {
+      deletingRef.current = false;
+      setDeleting(false);
     }
-    onClose();
   };
 
   return (
@@ -46,14 +54,8 @@ export default function DeleteLinkModal({ onClose, activeLink }: Props) {
       <div className="flex flex-col gap-3">
         <p>{t("link_deletion_confirmation_message")}</p>
 
-        <div role="alert" className="alert alert-info">
-          <i className="bi-info-circle text-xl" />
-          <span>
-            <b>{t("tip")}:</b> {t("shift_key_tip")}
-          </span>
-        </div>
 
-        <Button className="ml-auto" variant="destructive" onClick={submit}>
+        <Button className="ml-auto" variant="destructive" onClick={submit} disabled={deleting || !activeLink.id}>
           <i className="bi-trash text-xl" />
           {t("delete")}
         </Button>

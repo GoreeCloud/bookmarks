@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import CollectionSelection from "@/components/InputSelect/CollectionSelection";
 import TagSelection from "@/components/InputSelect/TagSelection";
 import useLinkStore from "@/store/links";
@@ -11,13 +11,19 @@ import { Button } from "../ui/button";
 import { Separator } from "../ui/separator";
 
 type Props = {
-  onClose: Function;
+  onClose: () => void;
+  selectedLinkIds: number[];
 };
 
-export default function BulkEditLinksModal({ onClose }: Props) {
+export default function BulkEditLinksModal({
+  onClose,
+  selectedLinkIds,
+}: Props) {
   const { t } = useTranslation();
-  const { selectedIds, clearSelected, selectionCount } = useLinkStore();
+  const { clearSelected } = useLinkStore();
+  const selectionCount = selectedLinkIds.length;
   const [submitLoader, setSubmitLoader] = useState(false);
+  const submittingRef = useRef(false);
   const [removePreviousTags, setRemovePreviousTags] = useState(false);
   const [updatedValues, setUpdatedValues] = useState<
     Pick<LinkIncludingShortenedCollectionAndTags, "tags" | "collectionId">
@@ -35,36 +41,36 @@ export default function BulkEditLinksModal({ onClose }: Props) {
   };
 
   const submit = async () => {
-    if (!submitLoader) {
-      setSubmitLoader(true);
+    if (submittingRef.current || selectionCount === 0) return;
+    submittingRef.current = true;
+    setSubmitLoader(true);
 
-      const load = toast.loading(t("updating"));
-
-      const links = Object.keys(selectedIds).map((k) => ({
-        id: Number(k),
-      }));
-
-      await updateLinks.mutateAsync(
-        {
-          links,
-          newData: updatedValues,
-          removePreviousTags,
-        },
-        {
-          onSettled: (data, error) => {
-            setSubmitLoader(false);
-            toast.dismiss(load);
-
-            if (error) {
-              toast.error(error.message);
-            } else {
-              clearSelected();
-              onClose();
-              toast.success(t("updated"));
-            }
-          },
-        }
+    const links = selectedLinkIds.map((id) => ({ id }));
+    const load = toast.loading(t("updating"));
+    let succeeded = false;
+    try {
+      await updateLinks.mutateAsync({
+        links,
+        newData: updatedValues,
+        removePreviousTags,
+      });
+      succeeded = true;
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : t("update_failed", { defaultValue: "Unable to update bookmarks" })
       );
+    } finally {
+      toast.dismiss(load);
+      submittingRef.current = false;
+      setSubmitLoader(false);
+    }
+
+    if (succeeded) {
+      clearSelected();
+      onClose();
+      toast.success(t("updated"));
     }
   };
 
@@ -107,7 +113,11 @@ export default function BulkEditLinksModal({ onClose }: Props) {
       </div>
 
       <div className="flex justify-end items-center mt-5">
-        <Button variant="primary" onClick={submit}>
+        <Button
+          variant="primary"
+          onClick={submit}
+          disabled={submitLoader || selectionCount === 0}
+        >
           {t("save_changes")}
         </Button>
       </div>

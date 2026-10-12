@@ -15,6 +15,9 @@ export function fallbackCopyTextToClipboard(text: string): boolean {
 
   try {
     return document.execCommand("copy");
+  } catch {
+    // Browsers may throw rather than return false when clipboard access is denied.
+    return false;
   } finally {
     textArea.remove();
   }

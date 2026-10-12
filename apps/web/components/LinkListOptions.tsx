@@ -1,4 +1,10 @@
-import React, { Dispatch, SetStateAction, useEffect, useState } from "react";
+import React, {
+  Dispatch,
+  SetStateAction,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import SortDropdown from "./SortDropdown";
 import ViewDropdown from "./ViewDropdown";
 import { TFunction } from "i18next";
@@ -11,7 +17,7 @@ import {
   Sort,
   ViewMode,
 } from "@linkwarden/types/global";
-import { useArchiveAction, useBulkDeleteLinks } from "@linkwarden/router/links";
+import { useArchiveAction } from "@linkwarden/router/links";
 import toast from "react-hot-toast";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,6 +27,10 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import ConfirmationModal from "./ConfirmationModal";
+import {
+  selectableBookmarkIds,
+  selectedVisibleBookmarkIds,
+} from "@/lib/client/visibleBookmarkSelection";
 
 type Props = {
   children: React.ReactNode;
@@ -45,10 +55,8 @@ const LinkListOptions = ({
   setEditMode,
   links,
 }: Props) => {
-  const { selectedIds, setSelected, clearSelected, selectionCount } =
-    useLinkStore();
+  const { selectedIds, setSelected, clearSelected } = useLinkStore();
 
-  const deleteLinksById = useBulkDeleteLinks();
   const refreshPreservations = useArchiveAction();
 
   const router = useRouter();
@@ -62,38 +70,37 @@ const LinkListOptions = ({
     if (editMode && setEditMode) return setEditMode(false);
   }, [router]);
 
+  const visibleIds = selectableBookmarkIds(links.map((link) => link.id));
+  const selectedVisibleIds = selectedVisibleBookmarkIds(
+    visibleIds,
+    selectedIds
+  );
+  const selectionCount = selectedVisibleIds.length;
+  const allVisibleSelected =
+    visibleIds.length > 0 && selectionCount === visibleIds.length;
+  const selectAllRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (selectAllRef.current) {
+      selectAllRef.current.indeterminate =
+        selectionCount > 0 && !allVisibleSelected;
+    }
+  }, [selectionCount, allVisibleSelected]);
+
   const handleSelectAll = () => {
-    if (selectionCount === links.length) {
+    if (allVisibleSelected) {
       clearSelected();
     } else {
-      setSelected(links.map((link) => link.id as number));
+      // Replace any selections left over from a different search or collection.
+      setSelected(visibleIds);
     }
-  };
-
-  const bulkDeleteLinks = async () => {
-    const load = toast.loading(t("deleting"));
-
-    const ids = Object.keys(selectedIds).map(Number);
-
-    await deleteLinksById.mutateAsync(ids, {
-      onSettled: (data, error) => {
-        toast.dismiss(load);
-
-        if (error) {
-          toast.error(error.message);
-        } else {
-          clearSelected();
-          setEditMode?.(false);
-          toast.success(t("deleted"));
-        }
-      },
-    });
   };
 
   const bulkRefreshPreservations = async () => {
     const load = toast.loading(t("sending_request"));
 
-    const ids = Object.keys(selectedIds).map(Number);
+    const ids = selectedVisibleIds;
+    if (ids.length === 0) return;
 
     await refreshPreservations.mutateAsync(
       {
@@ -155,10 +162,14 @@ const LinkListOptions = ({
         <div className="w-full flex justify-between items-center min-h-[32px]">
           <div className="flex gap-3 ml-3">
             <input
+              ref={selectAllRef}
               type="checkbox"
               className="checkbox checkbox-primary"
-              onChange={() => handleSelectAll()}
-              checked={selectionCount === links.length && links.length > 0}
+              aria-label={t("select_all_visible_bookmarks", {
+                defaultValue: "Select all visible bookmarks",
+              })}
+              onChange={handleSelectAll}
+              checked={allVisibleSelected}
             />
             {selectionCount > 0 ? (
               <span>
@@ -213,11 +224,7 @@ const LinkListOptions = ({
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
-                    onClick={(e) => {
-                      e.shiftKey
-                        ? bulkDeleteLinks()
-                        : setBulkDeleteLinksModal(true);
-                    }}
+                    onClick={() => setBulkDeleteLinksModal(true)}
                     variant="ghost"
                     size="icon"
                     disabled={selectionCount === 0}
@@ -236,6 +243,7 @@ const LinkListOptions = ({
 
       {bulkDeleteLinksModal && (
         <BulkDeleteLinksModal
+          selectedLinkIds={selectedVisibleIds}
           onClose={() => {
             setBulkDeleteLinksModal(false);
             setEditMode?.(false);
@@ -245,6 +253,7 @@ const LinkListOptions = ({
 
       {bulkEditLinksModal && (
         <BulkEditLinksModal
+          selectedLinkIds={selectedVisibleIds}
           onClose={() => {
             setBulkEditLinksModal(false);
             setEditMode?.(false);
