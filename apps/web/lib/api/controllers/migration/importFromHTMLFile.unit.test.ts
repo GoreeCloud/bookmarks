@@ -22,6 +22,8 @@ vi.mock("@linkwarden/lib/verifyCapacity", () => ({
 
 import importFromHTMLFile from "./importFromHTMLFile";
 import { renderNetscapeBookmarks } from "./renderNetscapeBookmarks";
+import { JSDOM } from "jsdom";
+import { parse } from "himalaya";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -80,6 +82,16 @@ describe("HTML import rejects unsafe links before storage", () => {
         }],
       }],
     });
+    const parsedDocument = new JSDOM(html).window.document;
+    const ddNode = parsedDocument.querySelector("dd");
+    console.info("HTML_ROUNDTRIP_DOM", JSON.stringify({
+      dd: ddNode?.outerHTML,
+      parent: ddNode?.parentElement?.tagName,
+      prev: ddNode?.previousElementSibling?.tagName,
+      parentHtml: ddNode?.parentElement?.outerHTML.slice(0,500),
+    }));
+    const tree = parse(parsedDocument.documentElement.outerHTML);
+    console.info("HTML_ROUNDTRIP_AST", JSON.stringify(tree).slice(0,6000));
     expect(await importFromHTMLFile(17, html)).toEqual({
       response: "Success.",
       status: 200,
