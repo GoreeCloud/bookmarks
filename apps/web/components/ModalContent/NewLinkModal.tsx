@@ -66,7 +66,7 @@ export default function NewLinkModal({ onClose }: Props) {
     const tagNames = selectedOptions.map((option: any) => ({
       name: option.label,
     }));
-    setLink({ ...link, tags: tagNames });
+    setLink((previous) => ({ ...previous, tags: tagNames }));
   };
 
   useEffect(() => {
@@ -117,7 +117,7 @@ export default function NewLinkModal({ onClose }: Props) {
   };
 
   return (
-    <Modal toggleModal={onClose}>
+    <Modal toggleModal={onClose} dismissible={!submitting}>
       <p className="text-xl font-thin">{t("create_new_link")}</p>
 
       <Separator className="my-3" />
@@ -128,7 +128,7 @@ export default function NewLinkModal({ onClose }: Props) {
           <TextInput
             ref={inputRef}
             value={link.url || ""}
-            onChange={(e) => setLink({ ...link, url: e.target.value })}
+            onChange={(e) => setLink((previous) => ({ ...previous, url: e.target.value }))}
             placeholder={t("link_url_placeholder")}
             className="bg-base-200"
           />
@@ -152,7 +152,7 @@ export default function NewLinkModal({ onClose }: Props) {
             <p className="mb-2">{t("name")}</p>
             <TextInput
               value={link.name}
-              onChange={(e) => setLink({ ...link, name: e.target.value })}
+              onChange={(e) => setLink((previous) => ({ ...previous, name: e.target.value }))}
               placeholder={t("link_name_placeholder")}
               className="bg-base-200"
             />
@@ -171,7 +171,7 @@ export default function NewLinkModal({ onClose }: Props) {
             <textarea
               value={unescapeString(link.description || "") || ""}
               onChange={(e) =>
-                setLink({ ...link, description: e.target.value })
+                setLink((previous) => ({ ...previous, description: e.target.value }))
               }
               placeholder={t("link_description_placeholder")}
               className="resize-none w-full h-32 rounded-md p-2 border-neutral-content bg-base-200 focus:border-primary border-solid border outline-none duration-100"
@@ -190,7 +190,7 @@ export default function NewLinkModal({ onClose }: Props) {
           <i className={`bi-chevron-${optionsExpanded ? "up" : "down"}`} />
         </Button>
         <Button variant="primary" onClick={submit} disabled={submitting}>
-          {t("create_link")}
+          {submitting ? t("creating") : t("create_link")}
         </Button>
       </div>
     </Modal>
