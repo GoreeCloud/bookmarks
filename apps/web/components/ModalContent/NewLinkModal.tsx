@@ -73,15 +73,27 @@ export default function NewLinkModal({ onClose }: Props) {
     if (initialCollectionResolved.current || !router.isReady) return;
 
     // Do not resolve collection context before the collection query settles.
-    if (router.pathname.startsWith("/collections/") && !isFetched && !isError) return;
+    if (router.pathname.startsWith("/collections/") && !isFetched && !isError)
+      return;
 
     initialCollectionResolved.current = true;
     if (manuallySelectedCollection.current) return;
-    const collection = resolveQuickSaveCollection(router.pathname, router.query.id, collections);
+    const collection = resolveQuickSaveCollection(
+      router.pathname,
+      router.query.id,
+      collections
+    );
 
     // Preserve URL, notes and tags entered while the query was loading.
     setLink((previous) => ({ ...previous, collection }));
-  }, [router.isReady, router.pathname, router.query.id, collections, isFetched, isError]);
+  }, [
+    router.isReady,
+    router.pathname,
+    router.query.id,
+    collections,
+    isFetched,
+    isError,
+  ]);
 
   useLayoutEffect(() => {
     inputRef.current?.focus();
@@ -128,7 +140,9 @@ export default function NewLinkModal({ onClose }: Props) {
           <TextInput
             ref={inputRef}
             value={link.url || ""}
-            onChange={(e) => setLink((previous) => ({ ...previous, url: e.target.value }))}
+            onChange={(e) =>
+              setLink((previous) => ({ ...previous, url: e.target.value }))
+            }
             placeholder={t("link_url_placeholder")}
             className="bg-base-200"
           />
@@ -152,7 +166,9 @@ export default function NewLinkModal({ onClose }: Props) {
             <p className="mb-2">{t("name")}</p>
             <TextInput
               value={link.name}
-              onChange={(e) => setLink((previous) => ({ ...previous, name: e.target.value }))}
+              onChange={(e) =>
+                setLink((previous) => ({ ...previous, name: e.target.value }))
+              }
               placeholder={t("link_name_placeholder")}
               className="bg-base-200"
             />
@@ -171,7 +187,10 @@ export default function NewLinkModal({ onClose }: Props) {
             <textarea
               value={unescapeString(link.description || "") || ""}
               onChange={(e) =>
-                setLink((previous) => ({ ...previous, description: e.target.value }))
+                setLink((previous) => ({
+                  ...previous,
+                  description: e.target.value,
+                }))
               }
               placeholder={t("link_description_placeholder")}
               className="resize-none w-full h-32 rounded-md p-2 border-neutral-content bg-base-200 focus:border-primary border-solid border outline-none duration-100"
