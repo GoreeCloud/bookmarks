@@ -4,6 +4,7 @@ import TagSelection from "@/components/InputSelect/TagSelection";
 import TextInput from "@/components/TextInput";
 import unescapeString from "@/lib/client/unescapeString";
 import persistBeforeClose from "@/lib/client/persistBeforeClose";
+import resolveQuickSaveCollection from "@/lib/client/resolveQuickSaveCollection";
 import { useRouter } from "next/router";
 import Modal from "../Modal";
 import { useTranslation } from "next-i18next";
@@ -46,14 +47,19 @@ export default function NewLinkModal({ onClose }: Props) {
   const submittingRef = useRef(false);
   const [submitting, setSubmitting] = useState(false);
   const router = useRouter();
-  const { data: collections = [] } = useCollections();
+  const { data: collections = [], isFetched, isError } = useCollections();
+  const initialCollectionResolved = useRef(false);
+  const manuallySelectedCollection = useRef(false);
 
   const setCollection = (e: any) => {
-    if (e?.__isNew__) e.value = undefined;
-    setLink({
-      ...link,
-      collection: { id: e?.value, name: e?.label },
-    });
+    manuallySelectedCollection.current = true;
+    setLink((previous) => ({
+      ...previous,
+      collection: {
+        id: e?.__isNew__ ? undefined : e?.value,
+        name: e?.label || "Unorganized",
+      },
+    }));
   };
 
   const setTags = (selectedOptions: any = []) => {
@@ -64,25 +70,18 @@ export default function NewLinkModal({ onClose }: Props) {
   };
 
   useEffect(() => {
-    if (router.pathname.startsWith("/collections/") && router.query.id) {
-      const currentCollection = collections.find(
-        (e) => e.id == Number(router.query.id)
-      );
+    if (initialCollectionResolved.current || !router.isReady) return;
 
-      if (currentCollection && currentCollection.ownerId)
-        setLink({
-          ...initial,
-          collection: {
-            id: currentCollection.id,
-            name: currentCollection.name,
-          },
-        });
-    } else
-      setLink({
-        ...initial,
-        collection: { name: "Unorganized" },
-      });
-  }, []);
+    // Do not resolve collection context before the collection query settles.
+    if (router.pathname.startsWith("/collections/") && !isFetched && !isError) return;
+
+    initialCollectionResolved.current = true;
+    if (manuallySelectedCollection.current) return;
+    const collection = resolveQuickSaveCollection(router.pathname, router.query.id, collections);
+
+    // Preserve URL, notes and tags entered while the query was loading.
+    setLink((previous) => ({ ...previous, collection }));
+  }, [router.isReady, router.pathname, router.query.id, collections, isFetched, isError]);
 
   useLayoutEffect(() => {
     inputRef.current?.focus();
