@@ -1,32 +1,75 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Button } from "./ui/button";
 import { copyTextToClipboard } from "@/lib/copyToClipboard";
+import { useTranslation } from "next-i18next";
+import toast from "react-hot-toast";
 
 type Props = {
   text: string;
 };
 
 const CopyButton: React.FC<Props> = ({ text }) => {
+  const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const resetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (resetTimer.current) clearTimeout(resetTimer.current);
+    };
+  }, []);
 
   const handleCopy = async () => {
+    if (busy) return;
+    setBusy(true);
+
     try {
-      const copied = await copyTextToClipboard(text);
-      if (!copied) return;
+      const succeeded = await copyTextToClipboard(text);
+      if (!succeeded) {
+        toast.error(
+          t("clipboard_copy_failed", {
+            defaultValue: "Could not copy to clipboard",
+          })
+        );
+        return;
+      }
 
       setCopied(true);
-      setTimeout(() => {
+      if (resetTimer.current) clearTimeout(resetTimer.current);
+      resetTimer.current = setTimeout(() => {
         setCopied(false);
       }, 1000);
-    } catch (err) {
-      console.log(err);
+    } catch {
+      // Clipboard permissions may fail without any readable exception.
+      toast.error(
+        t("clipboard_copy_failed", {
+          defaultValue: "Could not copy to clipboard",
+        })
+      );
+    } finally {
+      setBusy(false);
     }
   };
 
   return (
-    <Button variant="ghost" type="button" size="icon" onClick={handleCopy}>
+    <Button
+      variant="ghost"
+      type="button"
+      size="icon"
+      onClick={handleCopy}
+      disabled={busy}
+      aria-label={
+        copied
+          ? t("copied")
+          : t("copy_to_clipboard", {
+              defaultValue: "Copy to clipboard",
+            })
+      }
+    >
       {copied ? (
         <svg
+          aria-hidden="true"
           xmlns="http://www.w3.org/2000/svg"
           width="16"
           height="16"
@@ -38,6 +81,7 @@ const CopyButton: React.FC<Props> = ({ text }) => {
         </svg>
       ) : (
         <svg
+          aria-hidden="true"
           xmlns="http://www.w3.org/2000/svg"
           width="16"
           height="16"
