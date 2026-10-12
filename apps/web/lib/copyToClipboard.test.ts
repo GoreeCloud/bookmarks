@@ -75,6 +75,38 @@ describe("copyToClipboard", () => {
     expect(document.querySelector("textarea")).toBeNull();
   });
 
+  it("restores keyboard focus after successful fallback copying", () => {
+    mockExecCommand(true);
+    const button = document.createElement("button");
+    document.body.appendChild(button);
+    button.focus();
+    try {
+      expect(document.activeElement).toBe(button);
+      expect(fallbackCopyTextToClipboard("safe bookmark")).toBe(true);
+      expect(document.activeElement).toBe(button);
+      expect(document.querySelector("textarea")).toBeNull();
+    } finally {
+      button.remove();
+    }
+  });
+
+  it("restores keyboard focus and removes staging after a denied copy", () => {
+    Object.defineProperty(document, "execCommand", {
+      configurable: true,
+      value: vi.fn(() => { throw new Error("clipboard denied"); }),
+    });
+    const button = document.createElement("button");
+    document.body.appendChild(button);
+    button.focus();
+    try {
+      expect(fallbackCopyTextToClipboard("safe bookmark")).toBe(false);
+      expect(document.activeElement).toBe(button);
+      expect(document.querySelector("textarea")).toBeNull();
+    } finally {
+      button.remove();
+    }
+  });
+
   it("cleans up the temporary textarea used by the fallback", () => {
     const execCommand = mockExecCommand(true);
 
