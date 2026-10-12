@@ -1,6 +1,7 @@
 import { LinkIncludingShortenedCollectionAndTags } from "@linkwarden/types/global";
 import getFormatBasedOnPreference from "@linkwarden/lib/getFormatBasedOnPreference";
 import { LinksRouteTo } from "@linkwarden/prisma/client";
+import safeExternalUrl from "./safeExternalUrl";
 
 const openLink = (
   link: LinkIncludingShortenedCollectionAndTags,
@@ -15,12 +16,18 @@ const openLink = (
       preference: user.linksRouteTo,
     });
 
-    window.open(
+    const target =
       format !== null
-        ? `/preserved/${link?.id}?format=${format}`
-        : (link.url as string),
-      "_blank"
-    );
+        ? `/preserved/${link?.id}?format=${encodeURIComponent(format)}`
+        : safeExternalUrl(link.url);
+
+    // Avoid opening unsafe legacy URLs or URL-less notes as external tabs.
+    if (!target) {
+      openModal();
+      return;
+    }
+
+    window.open(target, "_blank", "noopener,noreferrer");
   }
 };
 
