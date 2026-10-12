@@ -100,6 +100,23 @@ describe("Linkwarden-compatible JSON backup import", () => {
     expect(stubs.repairFolders).not.toHaveBeenCalled();
   });
 
+  it("rejects oversized backup fan-out before quota checks or writes", async () => {
+    for (const backup of [
+      { collections: Array.from({ length: 2001 }, () => ({ name: "A", links: [] })) },
+      { collections: [{ name: "A", links: Array.from({ length: 30001 }, () => ({
+        name: "B", url: "https://example.org/", tags: [],
+      })) }] },
+      { collections: [], pinnedLinks: Array.from({ length: 30001 }, () => ({
+        url: "https://example.org/",
+      })) },
+    ]) {
+      expect((await importFromLinkwarden(17, JSON.stringify(backup))).status).toBe(413);
+    }
+    expect(stubs.quota).not.toHaveBeenCalled();
+    expect(stubs.transaction).not.toHaveBeenCalled();
+    expect(stubs.repairFolders).not.toHaveBeenCalled();
+  });
+
   it("reports a failed transaction without claiming success or creating folders", async () => {
     stubs.transaction.mockRejectedValueOnce(new Error("constraint rejected"));
     expect(await importFromLinkwarden(17, JSON.stringify(validBackup))).toEqual(

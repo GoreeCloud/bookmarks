@@ -3,6 +3,7 @@ import type { Backup } from "@linkwarden/types/global";
 import { ensureOwnedArchiveFolders } from "./ensureOwnedArchiveFolders";
 import { hasPassedLimit } from "@linkwarden/lib/verifyCapacity";
 import { normalizeImportedBookmarkUrl } from "./importSafety";
+import { getBackupWorkloadError } from "./jsonBackupLimits";
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === "object" && !Array.isArray(value);
@@ -58,6 +59,8 @@ export default async function importFromLinkwarden(
   } catch {
     return { response: "Invalid bookmark backup JSON.", status: 400 };
   }
+  const workloadError = getBackupWorkloadError(input);
+  if (workloadError) return { response: workloadError, status: 413 };
   if (!validBackupShape(input)) {
     return { response: "Invalid bookmark backup structure.", status: 400 };
   }
