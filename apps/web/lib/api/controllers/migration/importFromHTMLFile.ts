@@ -76,7 +76,7 @@ async function processBookmarks(
           if (collectionNameContent) {
             collectionId = await createCollection(
               userId,
-              collectionNameContent,
+              decodeEntities(collectionNameContent),
               parentCollectionId
             );
           } else {
@@ -104,9 +104,9 @@ async function processBookmarks(
           decodeEntities(rawLinkUrl)
         );
 
-        const linkName = (
+        const linkName = decodeEntities((
           item?.children.find((e) => e.type === "text") as TextNode
-        )?.content;
+        )?.content);
 
         const linkTags = item?.attributes
           .find((e) => e.key === "tags")
@@ -120,14 +120,15 @@ async function processBookmarks(
 
         const linkDate = parseImportedBookmarkDate(linkDateValue);
 
-        let linkDesc =
+        const linkDesc = decodeEntities(
           (
             (
               item?.children?.find(
                 (e) => e.type === "element" && e.tagName === "dd"
               ) as Element
             )?.children[0] as TextNode
-          )?.content || "";
+          )?.content
+        );
 
         if (linkUrl && parentCollectionId) {
           await createLink(
@@ -270,21 +271,28 @@ const createLink = async (
 
 function processNodes(nodes: Node[]) {
   const findAndProcessDL = (node: Node) => {
-    if (node.type === "element" && node.tagName === "dl") {
+    if (node.type !== "element") return;
+    if (node.tagName === "dl") {
       processDLChildren(node);
-    } else if (
-      node.type === "element" &&
-      node.children &&
-      node.children.length
-    ) {
-      node.children.forEach((child) => findAndProcessDL(child));
     }
+    // Description associations also occur inside nested folder lists.
+    node.children.forEach(findAndProcessDL);
   };
 
   const processDLChildren = (dlNode: Element) => {
     dlNode.children.forEach((child, i) => {
       if (child.type === "element" && child.tagName === "dt") {
-        const nextSibling = dlNode.children[i + 1];
+        // Netscape files often put whitespace between <DT> and <DD>.
+        // Ignore text-only separators when attaching a description.
+        let descriptionIndex = i + 1;
+        while (
+          descriptionIndex < dlNode.children.length &&
+          dlNode.children[descriptionIndex].type === "text" &&
+          !(dlNode.children[descriptionIndex] as TextNode).content.trim()
+        ) {
+          descriptionIndex++;
+        }
+        const nextSibling = dlNode.children[descriptionIndex];
         if (
           nextSibling &&
           nextSibling.type === "element" &&
@@ -297,7 +305,7 @@ function processNodes(nodes: Node[]) {
             // Add the 'dd' element as a child of the 'a' element
             aElement.children.push(nextSibling);
             // Remove the 'dd' from the parent 'dl' to avoid duplicate processing
-            dlNode.children.splice(i + 1, 1);
+            dlNode.children.splice(descriptionIndex, 1);
           }
         }
       }
