@@ -17,7 +17,7 @@ import {
   Sort,
   ViewMode,
 } from "@linkwarden/types/global";
-import { useArchiveAction, useBulkDeleteLinks } from "@linkwarden/router/links";
+import { useArchiveAction } from "@linkwarden/router/links";
 import toast from "react-hot-toast";
 import { Button } from "@/components/ui/button";
 import {
@@ -57,7 +57,6 @@ const LinkListOptions = ({
 }: Props) => {
   const { selectedIds, setSelected, clearSelected } = useLinkStore();
 
-  const deleteLinksById = useBulkDeleteLinks();
   const refreshPreservations = useArchiveAction();
 
   const router = useRouter();
@@ -95,27 +94,6 @@ const LinkListOptions = ({
       // Replace any selections left over from a different search or collection.
       setSelected(visibleIds);
     }
-  };
-
-  const bulkDeleteLinks = async () => {
-    const load = toast.loading(t("deleting"));
-
-    const ids = selectedVisibleIds;
-    if (ids.length === 0) return;
-
-    await deleteLinksById.mutateAsync(ids, {
-      onSettled: (data, error) => {
-        toast.dismiss(load);
-
-        if (error) {
-          toast.error(error.message);
-        } else {
-          clearSelected();
-          setEditMode?.(false);
-          toast.success(t("deleted"));
-        }
-      },
-    });
   };
 
   const bulkRefreshPreservations = async () => {
