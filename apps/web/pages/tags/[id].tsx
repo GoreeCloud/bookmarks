@@ -3,8 +3,6 @@ import { FormEvent, ReactElement, useEffect, useState } from "react";
 import MainLayout from "@/layouts/MainLayout";
 import { Sort, ViewMode } from "@linkwarden/types/global";
 import { useLinks } from "@linkwarden/router/links";
-import BulkDeleteLinksModal from "@/components/ModalContent/BulkDeleteLinksModal";
-import BulkEditLinksModal from "@/components/ModalContent/BulkEditLinksModal";
 import { useTranslation } from "next-i18next";
 import getServerSideProps from "@/lib/client/getServerSideProps";
 import LinkListOptions from "@/components/LinkListOptions";
@@ -43,8 +41,6 @@ const Page: NextPageWithLayout = () => {
   const [renameTag, setRenameTag] = useState(false);
   const [newTagName, setNewTagName] = useState<string>();
 
-  const [bulkDeleteLinksModal, setBulkDeleteLinksModal] = useState(false);
-  const [bulkEditLinksModal, setBulkEditLinksModal] = useState(false);
   const [editMode, setEditMode] = useState(false);
 
   useEffect(() => {
@@ -225,12 +221,6 @@ const Page: NextPageWithLayout = () => {
             {t("this_tag_has_no_links_desc")}
           </p>
         </div>
-      )}
-      {bulkDeleteLinksModal && (
-        <BulkDeleteLinksModal onClose={() => setBulkDeleteLinksModal(false)} />
-      )}
-      {bulkEditLinksModal && (
-        <BulkEditLinksModal onClose={() => setBulkEditLinksModal(false)} />
       )}
     </div>
   );
