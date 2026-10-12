@@ -20,7 +20,12 @@ export function isDisposableBookmarkTestTarget(
 
   try {
     const target = new URL(environment.DATABASE_URL || "");
-    return (target.protocol === "postgresql:" || target.protocol === "postgres:") &&
+    let allowedParameters = true;
+    target.searchParams.forEach((value, key) => {
+      if (key !== "schema" || value !== "public") allowedParameters = false;
+    });
+    return !target.hash && allowedParameters &&
+      (target.protocol === "postgresql:" || target.protocol === "postgres:") &&
       target.pathname === "/bookmarks_test" &&
       ["localhost", "127.0.0.1", "[::1]"].includes(target.hostname) &&
       (target.port === "" || target.port === "5432");
