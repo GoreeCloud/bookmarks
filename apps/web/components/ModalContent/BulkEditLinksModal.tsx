@@ -75,7 +75,7 @@ export default function BulkEditLinksModal({
   };
 
   return (
-    <Modal toggleModal={onClose}>
+    <Modal toggleModal={onClose} dismissible={!submitLoader}>
       <p className="text-xl font-thin">
         {selectionCount === 1
           ? t("edit_link")
