@@ -2,7 +2,7 @@ import { useState } from "react";
 import { LinkIncludingShortenedCollectionAndTags } from "@linkwarden/types/global";
 import usePermissions from "@/hooks/usePermissions";
 import DeleteLinkModal from "@/components/ModalContent/DeleteLinkModal";
-import { useDeleteLink, useUpdateArchive } from "@linkwarden/router/links";
+import { useUpdateArchive } from "@linkwarden/router/links";
 import toast from "react-hot-toast";
 import LinkModal from "@/components/ModalContent/LinkModal";
 import { useRouter } from "next/router";
@@ -51,7 +51,6 @@ export default function LinkActions({
   const [refreshPreservationsModal, setRefreshPreservationsModal] =
     useState(false);
 
-  const deleteLink = useDeleteLink({ toast, t });
 
   const updateArchive = async () => {
     const load = toast.loading(t("sending_request"));
@@ -119,13 +118,7 @@ export default function LinkActions({
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   className="text-error"
-                  onClick={async (e) => {
-                    if (e.shiftKey) {
-                      await deleteLink.mutateAsync(link.id as number);
-                    } else {
-                      setDeleteLinkModal(true);
-                    }
-                  }}
+                  onClick={() => setDeleteLinkModal(true)}}
                 >
                   <i className="bi-trash" />
 
