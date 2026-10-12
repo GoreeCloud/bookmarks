@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import exportData from "@/lib/api/controllers/migration/exportData";
+import { renderNetscapeBookmarks } from "@/lib/api/controllers/migration/renderNetscapeBookmarks";
 import importFromHTMLFile from "@/lib/api/controllers/migration/importFromHTMLFile";
 import importFromLinkwarden from "@/lib/api/controllers/migration/importFromLinkwarden";
 import { MigrationFormat, MigrationRequest } from "@linkwarden/types/global";
@@ -52,7 +53,19 @@ export default async function users(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === "GET") {
     res.setHeader("Cache-Control", "private, no-store");
     res.setHeader("X-Content-Type-Options", "nosniff");
+    const requestedFormat = req.query.format;
+    if (requestedFormat !== undefined && requestedFormat !== "json" && requestedFormat !== "html") {
+      return res.status(400).json({ response: "Unsupported backup format." });
+    }
     const data = await exportData(user.id);
+    if (data.status !== 200) return res.status(data.status).json({ response: data.response });
+    if (requestedFormat === "html" && typeof data.response !== "string") {
+      return res
+        .setHeader("Content-Type", "text/html; charset=utf-8")
+        .setHeader("Content-Disposition", "attachment; filename=bookmarks.html")
+        .status(200)
+        .send(renderNetscapeBookmarks(data.response));
+    }
 
     if (data.status === 200)
       return res
