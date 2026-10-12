@@ -1,4 +1,4 @@
-type Collection = { id: number; name: string; ownerId?: number | null };
+type Collection = { id?: number; name: string; ownerId?: number | null };
 
 export default function resolveQuickSaveCollection(
   pathname: string,
@@ -14,5 +14,5 @@ export default function resolveQuickSaveCollection(
   const collection = collections.find(
     (entry) => entry.id === id && entry.ownerId != null
   );
-  return collection ? { id: collection.id, name: collection.name } : fallback;
+  return collection?.id != null ? { id: collection.id, name: collection.name } : fallback;
 }
