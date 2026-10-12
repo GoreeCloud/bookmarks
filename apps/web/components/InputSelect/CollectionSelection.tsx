@@ -10,6 +10,8 @@ import clsx from "clsx";
 type Props = {
   onChange: any;
   showDefaultValue?: boolean;
+  /** Opt-in controlled selection for async form hydration. */
+  selectedValue?: { label: string; value?: number } | null;
   defaultValue?:
     | {
         label: string;
@@ -26,6 +28,7 @@ export default function CollectionSelection({
   onChange,
   defaultValue,
   showDefaultValue = true,
+  selectedValue,
   creatable = true,
   autoFocus,
   onBlur,
@@ -115,6 +118,7 @@ export default function CollectionSelection({
         autoFocus={autoFocus}
         onBlur={onBlur}
         defaultValue={showDefaultValue ? defaultValue : null}
+        value={selectedValue}
         components={{
           Option: customOption,
         }}
@@ -132,6 +136,7 @@ export default function CollectionSelection({
         styles={styles}
         autoFocus={autoFocus}
         defaultValue={showDefaultValue ? defaultValue : null}
+        value={selectedValue}
         onBlur={onBlur}
         components={{
           Option: customOption,
