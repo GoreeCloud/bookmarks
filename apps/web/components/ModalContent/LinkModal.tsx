@@ -1,13 +1,12 @@
 import React, { useState } from "react";
 import { LinkIncludingShortenedCollectionAndTags } from "@linkwarden/types/global";
 import { useTranslation } from "next-i18next";
-import { useDeleteLink } from "@linkwarden/router/links";
+import safeExternalUrl from "@/lib/client/safeExternalUrl";
 import Drawer from "../Drawer";
 import LinkDetails from "../LinkDetails";
 import Link from "next/link";
 import usePermissions from "@/hooks/usePermissions";
 import { useRouter } from "next/router";
-import toast from "react-hot-toast";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -43,21 +42,12 @@ export default function LinkModal({
 
   const isPublicRoute = router.pathname.startsWith("/public") ? true : false;
 
-  const deleteLink = useDeleteLink({ toast, t });
-
   const [mode, setMode] = useState<"view" | "edit">(activeMode || "view");
 
-  const handleDelete = async (e: React.MouseEvent) => {
+  const handleDelete = () => {
     setTimeout(() => (document.body.style.pointerEvents = ""), 0);
-
-    if (e.shiftKey && link.id) {
-      deleteLink.mutateAsync(link.id);
-
-      onClose();
-    } else {
-      onDelete();
-      onClose();
-    }
+    onDelete();
+    onClose();
   };
 
   return (
@@ -153,7 +143,7 @@ export default function LinkModal({
               </DropdownMenuContent>
             </DropdownMenu>
           )}
-          {link.url && (
+          {safeExternalUrl(link.url) && (
             <Button
               asChild
               variant="simple"
@@ -161,8 +151,9 @@ export default function LinkModal({
               className="rounded-full"
             >
               <Link
-                href={link.url}
+                href={safeExternalUrl(link.url) as string}
                 target="_blank"
+                rel="noopener noreferrer"
                 className="bi-box-arrow-up-right text-base-content opacity-50 hover:opacity-100 select-none z-10"
               ></Link>
             </Button>
