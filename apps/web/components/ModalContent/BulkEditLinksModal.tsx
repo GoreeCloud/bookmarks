@@ -11,12 +11,17 @@ import { Button } from "../ui/button";
 import { Separator } from "../ui/separator";
 
 type Props = {
-  onClose: Function;
+  onClose: () => void;
+  selectedLinkIds: number[];
 };
 
-export default function BulkEditLinksModal({ onClose }: Props) {
+export default function BulkEditLinksModal({
+  onClose,
+  selectedLinkIds,
+}: Props) {
   const { t } = useTranslation();
-  const { selectedIds, clearSelected, selectionCount } = useLinkStore();
+  const { clearSelected } = useLinkStore();
+  const selectionCount = selectedLinkIds.length;
   const [submitLoader, setSubmitLoader] = useState(false);
   const [removePreviousTags, setRemovePreviousTags] = useState(false);
   const [updatedValues, setUpdatedValues] = useState<
@@ -35,14 +40,12 @@ export default function BulkEditLinksModal({ onClose }: Props) {
   };
 
   const submit = async () => {
-    if (!submitLoader) {
+    if (!submitLoader && selectionCount > 0) {
       setSubmitLoader(true);
 
       const load = toast.loading(t("updating"));
 
-      const links = Object.keys(selectedIds).map((k) => ({
-        id: Number(k),
-      }));
+      const links = selectedLinkIds.map((id) => ({ id }));
 
       await updateLinks.mutateAsync(
         {
@@ -107,7 +110,11 @@ export default function BulkEditLinksModal({ onClose }: Props) {
       </div>
 
       <div className="flex justify-end items-center mt-5">
-        <Button variant="primary" onClick={submit}>
+        <Button
+          variant="primary"
+          onClick={submit}
+          disabled={submitLoader || selectionCount === 0}
+        >
           {t("save_changes")}
         </Button>
       </div>
