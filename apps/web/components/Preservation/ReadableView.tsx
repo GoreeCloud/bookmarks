@@ -443,7 +443,7 @@ export default function ReadableView({ link }: Props) {
         {safeExternalUrl(link?.url) && (
           <Link
             href={safeExternalUrl(link?.url) as string}
-            title={link?.url}
+            title={link?.url ?? undefined}
             target="_blank"
             rel="noopener noreferrer"
             className="hover:opacity-60 duration-100 break-all text-sm flex items-center gap-1 text-neutral w-fit"
