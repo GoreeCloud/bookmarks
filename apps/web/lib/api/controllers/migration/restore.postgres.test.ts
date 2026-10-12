@@ -3,6 +3,7 @@ import { prisma } from "@linkwarden/prisma";
 import { fileExists, removeFolder } from "@linkwarden/filesystem";
 import importFromLinkwarden from "./importFromLinkwarden";
 import { ensureOwnedArchiveFolders } from "./ensureOwnedArchiveFolders";
+import { isDisposableBookmarkTestTarget } from "./disposableTestTarget";
 
 const users: number[] = [];
 const folders: number[] = [];
@@ -17,9 +18,9 @@ async function newTestUser() {
 }
 
 beforeAll(async () => {
-  // Never let this integration suite mutate a non-disposable database.
-  if (!process.env.DATABASE_URL?.includes("/bookmarks_test")) {
-    throw new Error("Use the disposable bookmarks_test PostgreSQL database only.");
+  // Do not connect to any database until every isolation boundary is verified.
+  if (!isDisposableBookmarkTestTarget(process.env)) {
+    throw new Error("Isolated local test database and explicit opt-in required.");
   }
   await prisma.$connect();
 });
