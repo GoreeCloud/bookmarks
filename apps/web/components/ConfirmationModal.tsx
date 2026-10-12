@@ -6,7 +6,7 @@ import { Separator } from "./ui/separator";
 import confirmActionBeforeClose from "@/lib/client/confirmActionBeforeClose";
 
 type Props = {
-  toggleModal: () => void;
+  toggleModal: Function;
   className?: string;
   children: ReactNode;
   title: string;
@@ -35,7 +35,7 @@ export default function ConfirmationModal({
     pendingRef.current = true;
     setPending(true);
     try {
-      await confirmActionBeforeClose(onConfirmed, toggleModal);
+      await confirmActionBeforeClose(onConfirmed, () => toggleModal());
     } finally {
       pendingRef.current = false;
       setPending(false);
