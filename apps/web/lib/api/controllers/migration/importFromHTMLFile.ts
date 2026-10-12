@@ -76,7 +76,7 @@ async function processBookmarks(
           if (collectionNameContent) {
             collectionId = await createCollection(
               userId,
-              collectionNameContent,
+              decodeEntities(collectionNameContent),
               parentCollectionId
             );
           } else {
@@ -104,9 +104,9 @@ async function processBookmarks(
           decodeEntities(rawLinkUrl)
         );
 
-        const linkName = (
+        const linkName = decodeEntities((
           item?.children.find((e) => e.type === "text") as TextNode
-        )?.content;
+        )?.content);
 
         const linkTags = item?.attributes
           .find((e) => e.key === "tags")
@@ -120,14 +120,15 @@ async function processBookmarks(
 
         const linkDate = parseImportedBookmarkDate(linkDateValue);
 
-        let linkDesc =
+        const linkDesc = decodeEntities(
           (
             (
               item?.children?.find(
                 (e) => e.type === "element" && e.tagName === "dd"
               ) as Element
             )?.children[0] as TextNode
-          )?.content || "";
+          )?.content
+        );
 
         if (linkUrl && parentCollectionId) {
           await createLink(
