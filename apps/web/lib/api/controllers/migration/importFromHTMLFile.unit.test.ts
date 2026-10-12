@@ -21,6 +21,7 @@ vi.mock("@linkwarden/lib/verifyCapacity", () => ({
 }));
 
 import importFromHTMLFile from "./importFromHTMLFile";
+import { renderNetscapeBookmarks } from "./renderNetscapeBookmarks";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -66,4 +67,38 @@ describe("HTML import rejects unsafe links before storage", () => {
     expect(stubs.createCollection).not.toHaveBeenCalled();
     expect(stubs.createLink).not.toHaveBeenCalled();
   });
+  it("imports HTML rendered from an owned bookmark backup with folder, tag and date", async () => {
+    const html = renderNetscapeBookmarks({
+      collections: [{
+        name: "Research & Design",
+        links: [{
+          name: "Design < Patterns",
+          url: "https://example.org/read?a=1&b=2",
+          description: "Useful & private",
+          createdAt: "2023-11-14T22:13:20Z",
+          tags: [{ name: "design" }, { name: "reference" }],
+        }],
+      }],
+    });
+    expect(await importFromHTMLFile(17, html)).toEqual({
+      response: "Success.",
+      status: 200,
+    });
+    expect(stubs.quota).toHaveBeenCalledWith(17, 1);
+    expect(stubs.findCollection).toHaveBeenCalledWith({
+      where: { parentId: undefined, name: "Research & Design", ownerId: 17 },
+    });
+    expect(stubs.createLink).toHaveBeenCalledTimes(1);
+    expect(stubs.createLink.mock.calls[0][0]).toMatchObject({
+      data: {
+        createdById: 17,
+        collectionId: 71,
+        url: "https://example.org/read?a=1&b=2",
+        name: "Design < Patterns",
+        description: "Useful & private",
+        importDate: new Date("2023-11-14T22:13:20Z"),
+      },
+    });
+  });
+
 });
