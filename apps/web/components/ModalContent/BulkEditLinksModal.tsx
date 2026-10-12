@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import CollectionSelection from "@/components/InputSelect/CollectionSelection";
 import TagSelection from "@/components/InputSelect/TagSelection";
 import useLinkStore from "@/store/links";
@@ -23,6 +23,7 @@ export default function BulkEditLinksModal({
   const { clearSelected } = useLinkStore();
   const selectionCount = selectedLinkIds.length;
   const [submitLoader, setSubmitLoader] = useState(false);
+  const submittingRef = useRef(false);
   const [removePreviousTags, setRemovePreviousTags] = useState(false);
   const [updatedValues, setUpdatedValues] = useState<
     Pick<LinkIncludingShortenedCollectionAndTags, "tags" | "collectionId">
@@ -40,34 +41,36 @@ export default function BulkEditLinksModal({
   };
 
   const submit = async () => {
-    if (!submitLoader && selectionCount > 0) {
-      setSubmitLoader(true);
+    if (submittingRef.current || selectionCount === 0) return;
+    submittingRef.current = true;
+    setSubmitLoader(true);
 
-      const load = toast.loading(t("updating"));
-
-      const links = selectedLinkIds.map((id) => ({ id }));
-
-      await updateLinks.mutateAsync(
-        {
-          links,
-          newData: updatedValues,
-          removePreviousTags,
-        },
-        {
-          onSettled: (data, error) => {
-            setSubmitLoader(false);
-            toast.dismiss(load);
-
-            if (error) {
-              toast.error(error.message);
-            } else {
-              clearSelected();
-              onClose();
-              toast.success(t("updated"));
-            }
-          },
-        }
+    const links = selectedLinkIds.map((id) => ({ id }));
+    const load = toast.loading(t("updating"));
+    let succeeded = false;
+    try {
+      await updateLinks.mutateAsync({
+        links,
+        newData: updatedValues,
+        removePreviousTags,
+      });
+      succeeded = true;
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : t("update_failed", { defaultValue: "Unable to update bookmarks" })
       );
+    } finally {
+      toast.dismiss(load);
+      submittingRef.current = false;
+      setSubmitLoader(false);
+    }
+
+    if (succeeded) {
+      clearSelected();
+      onClose();
+      toast.success(t("updated"));
     }
   };
 
