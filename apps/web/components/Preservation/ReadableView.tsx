@@ -6,7 +6,7 @@ import { useTranslation } from "next-i18next";
 import { useRouter } from "next/router";
 import Link from "next/link";
 import unescapeString from "@/lib/client/unescapeString";
-import isValidUrl from "@/lib/shared/isValidUrl";
+import safeExternalUrl from "@/lib/client/safeExternalUrl";
 import LinkDate from "../LinkViews/LinkComponents/LinkDate";
 import usePermissions from "@/hooks/usePermissions";
 import {
@@ -440,15 +440,16 @@ export default function ReadableView({ link }: Props) {
           </h1>
         </div>
 
-        {link?.url && (
+        {safeExternalUrl(link?.url) && (
           <Link
-            href={link?.url || ""}
+            href={safeExternalUrl(link?.url) as string}
             title={link?.url}
             target="_blank"
+            rel="noopener noreferrer"
             className="hover:opacity-60 duration-100 break-all text-sm flex items-center gap-1 text-neutral w-fit"
           >
             <i className="bi-link-45deg" />
-            {isValidUrl(link?.url || "") && new URL(link?.url as string).host}
+            {new URL(safeExternalUrl(link?.url) as string).host}
           </Link>
         )}
 
