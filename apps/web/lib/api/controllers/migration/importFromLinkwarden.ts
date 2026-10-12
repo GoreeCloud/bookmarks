@@ -4,23 +4,35 @@ import { ensureOwnedArchiveFolders } from "./ensureOwnedArchiveFolders";
 import { hasPassedLimit } from "@linkwarden/lib/verifyCapacity";
 import { normalizeImportedBookmarkUrl } from "./importSafety";
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  value !== null && typeof value === "object" && !Array.isArray(value);
+
+const optionalText = (value: unknown): boolean =>
+  value === null || value === undefined || typeof value === "string";
+
 function validBackupShape(input: unknown): input is Backup {
-  if (!input || typeof input !== "object") return false;
-  const backup = input as Partial<Backup>;
-  return (
-    Array.isArray(backup.collections) &&
-    (backup.pinnedLinks === undefined || Array.isArray(backup.pinnedLinks)) &&
-    backup.collections.every(
-      (c) =>
-        c &&
-        typeof c.name === "string" &&
-        Array.isArray(c.links) &&
-        c.links.every(
-          (link) =>
-            link &&
-            Array.isArray(link.tags) &&
-            link.tags.every((tag) => tag && typeof tag.name === "string")
-        )
+  if (!isRecord(input) || !Array.isArray(input.collections) ||
+      (input.pinnedLinks !== undefined && !Array.isArray(input.pinnedLinks))) {
+    return false;
+  }
+  if (Array.isArray(input.pinnedLinks) && input.pinnedLinks.some((pin: unknown) =>
+    !isRecord(pin) || !optionalText(pin.url))) {
+    return false;
+  }
+  return input.collections.every((collection: unknown) =>
+    isRecord(collection) &&
+    typeof collection.name === "string" &&
+    optionalText(collection.description) &&
+    optionalText(collection.color) &&
+    Array.isArray(collection.links) &&
+    collection.links.every((link: unknown) =>
+      isRecord(link) &&
+      optionalText(link.url) &&
+      optionalText(link.name) &&
+      optionalText(link.description) &&
+      Array.isArray(link.tags) &&
+      link.tags.every((tag: unknown) =>
+        isRecord(tag) && typeof tag.name === "string")
     )
   );
 }
