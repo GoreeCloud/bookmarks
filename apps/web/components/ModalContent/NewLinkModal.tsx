@@ -3,6 +3,7 @@ import CollectionSelection from "@/components/InputSelect/CollectionSelection";
 import TagSelection from "@/components/InputSelect/TagSelection";
 import TextInput from "@/components/TextInput";
 import unescapeString from "@/lib/client/unescapeString";
+import persistBeforeClose from "@/lib/client/persistBeforeClose";
 import { useRouter } from "next/router";
 import Modal from "../Modal";
 import { useTranslation } from "next-i18next";
@@ -42,6 +43,8 @@ export default function NewLinkModal({ onClose }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [link, setLink] = useState<PostLinkSchemaType>(initial);
   const [optionsExpanded, setOptionsExpanded] = useState(false);
+  const submittingRef = useRef(false);
+  const [submitting, setSubmitting] = useState(false);
   const router = useRouter();
   const { data: collections = [] } = useCollections();
 
@@ -86,6 +89,9 @@ export default function NewLinkModal({ onClose }: Props) {
   }, []);
 
   const submit = async () => {
+    // A synchronous guard also prevents a second click before React rerenders.
+    if (submittingRef.current) return;
+
     const dataValidation = PostLinkSchema.safeParse(link);
 
     if (!dataValidation.success)
@@ -95,8 +101,20 @@ export default function NewLinkModal({ onClose }: Props) {
         } [${dataValidation.error.issues[0].path.join(", ")}]`
       );
 
-    addLink.mutateAsync(link);
-    onClose();
+    submittingRef.current = true;
+    setSubmitting(true);
+    try {
+      // The mutation hook displays errors and rolls back optimistic updates.
+      // Keep the entered bookmark visible if persistence fails.
+      await persistBeforeClose(
+        link,
+        (value) => addLink.mutateAsync(value),
+        onClose
+      );
+    } finally {
+      submittingRef.current = false;
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -172,7 +190,7 @@ export default function NewLinkModal({ onClose }: Props) {
           <p>{optionsExpanded ? t("hide_options") : t("more_options")}</p>
           <i className={`bi-chevron-${optionsExpanded ? "up" : "down"}`} />
         </Button>
-        <Button variant="primary" onClick={submit}>
+        <Button variant="primary" onClick={submit} disabled={submitting}>
           {t("create_link")}
         </Button>
       </div>
