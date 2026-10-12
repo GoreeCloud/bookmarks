@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   LinkIncludingShortenedCollectionAndTags,
   ArchivedFormat,
@@ -27,6 +27,7 @@ import CollectionSelection from "./InputSelect/CollectionSelection";
 import TagSelection from "./InputSelect/TagSelection";
 import unescapeString from "@/lib/client/unescapeString";
 import safeExternalUrl from "@/lib/client/safeExternalUrl";
+import persistBeforeClose from "@/lib/client/persistBeforeClose";
 import IconPopover from "./IconPopover";
 import TextInput from "./TextInput";
 import usePermissions from "@/hooks/usePermissions";
@@ -110,9 +111,12 @@ export default function LinkDetails({
 
   const updateLink = useUpdateLink({ toast, t });
   const updateFile = useUpdateFile();
+  const savingRef = useRef(false);
+  const [saving, setSaving] = useState(false);
 
   const submit = async (e?: any) => {
     e?.preventDefault();
+    if (savingRef.current) return;
 
     const { updatedAt: b, ...oldLink } = activeLink;
     const { updatedAt: a, ...newLink } = link;
@@ -121,9 +125,20 @@ export default function LinkDetails({
       return;
     }
 
-    updateLink.mutateAsync(link);
-
-    setMode && setMode("view");
+    // Preserve the edited fields and let the mutation hook report errors if
+    // persistence fails; the editor must not disappear before a confirmed save.
+    savingRef.current = true;
+    setSaving(true);
+    try {
+      await persistBeforeClose(
+        link,
+        (value) => updateLink.mutateAsync(value),
+        () => setMode && setMode("view")
+      );
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
+    }
   };
 
   const setCollection = (e: any) => {
@@ -640,10 +655,11 @@ export default function LinkDetails({
               <div className="flex justify-end items-center">
                 <Button
                   variant="primary"
-                  disabled={JSON.stringify(activeLink) === JSON.stringify(link)}
+                  disabled={saving || JSON.stringify(activeLink) === JSON.stringify(link)}
+                  aria-busy={saving}
                   onClick={submit}
                 >
-                  {t("save_changes")}
+                  {saving ? t("updating") : t("save_changes")}
                 </Button>
               </div>
             </>
