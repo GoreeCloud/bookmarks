@@ -119,7 +119,7 @@ export default function LinkActions({
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   className="text-error"
-                  onClick={() => setDeleteLinkModal(true)}}
+                  onClick={() => setDeleteLinkModal(true)}
                 >
                   <i className="bi-trash" />
 
