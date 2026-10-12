@@ -285,7 +285,17 @@ function processNodes(nodes: Node[]) {
   const processDLChildren = (dlNode: Element) => {
     dlNode.children.forEach((child, i) => {
       if (child.type === "element" && child.tagName === "dt") {
-        const nextSibling = dlNode.children[i + 1];
+        // Netscape files often put whitespace between <DT> and <DD>.
+        // Ignore text-only separators when attaching a description.
+        let descriptionIndex = i + 1;
+        while (
+          descriptionIndex < dlNode.children.length &&
+          dlNode.children[descriptionIndex].type === "text" &&
+          !(dlNode.children[descriptionIndex] as TextNode).content.trim()
+        ) {
+          descriptionIndex++;
+        }
+        const nextSibling = dlNode.children[descriptionIndex];
         if (
           nextSibling &&
           nextSibling.type === "element" &&
@@ -298,7 +308,7 @@ function processNodes(nodes: Node[]) {
             // Add the 'dd' element as a child of the 'a' element
             aElement.children.push(nextSibling);
             // Remove the 'dd' from the parent 'dl' to avoid duplicate processing
-            dlNode.children.splice(i + 1, 1);
+            dlNode.children.splice(descriptionIndex, 1);
           }
         }
       }
