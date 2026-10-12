@@ -13,6 +13,9 @@ describe("disposable migration test target", () => {
     expect(isDisposableBookmarkTestTarget({
       ...valid, DATABASE_URL: "postgres://testuser@localhost/bookmarks_test",
     })).toBe(true);
+    expect(isDisposableBookmarkTestTarget({
+      ...valid, DATABASE_URL: "postgresql://localhost/bookmarks_test?schema=public",
+    })).toBe(true);
   });
 
   it("rejects production-like and misleading database URLs", () => {
@@ -23,6 +26,9 @@ describe("disposable migration test target", () => {
       "postgresql://127.0.0.1/bookmarks_test_backup",
       "postgresql://127.0.0.1:5433/bookmarks_test",
       "mysql://localhost/bookmarks_test",
+      "postgresql://localhost/bookmarks_test?host=outside.example",
+      "postgresql://localhost/bookmarks_test?schema=elsewhere",
+      "postgresql://localhost/bookmarks_test#extra",
       "not-a-url",
     ]) {
       expect(isDisposableBookmarkTestTarget({ ...valid, DATABASE_URL: url })).toBe(false);
