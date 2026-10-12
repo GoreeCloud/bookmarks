@@ -8,18 +8,24 @@ import toast from "react-hot-toast";
 import { Separator } from "../ui/separator";
 
 type Props = {
-  onClose: Function;
+  onClose: () => void;
+  selectedLinkIds: number[];
 };
 
-export default function BulkDeleteLinksModal({ onClose }: Props) {
+export default function BulkDeleteLinksModal({
+  onClose,
+  selectedLinkIds,
+}: Props) {
   const { t } = useTranslation();
-  const { selectedIds, clearSelected, selectionCount } = useLinkStore();
+  const { clearSelected } = useLinkStore();
+  const selectionCount = selectedLinkIds.length;
 
   const deleteLinksById = useBulkDeleteLinks();
 
   const deleteLink = async () => {
+    if (selectedLinkIds.length === 0) return;
     const load = toast.loading(t("deleting"));
-    const ids = Object.keys(selectedIds).map(Number);
+    const ids = selectedLinkIds;
 
     await deleteLinksById.mutateAsync(ids, {
       onSettled: (data, error) => {
@@ -60,9 +66,12 @@ export default function BulkDeleteLinksModal({ onClose }: Props) {
           <span>{t("warning_irreversible")}</span>
         </div>
 
-        <p>{t("shift_key_tip")}</p>
-
-        <Button className="ml-auto" variant="destructive" onClick={deleteLink}>
+        <Button
+          className="ml-auto"
+          variant="destructive"
+          onClick={deleteLink}
+          disabled={selectionCount === 0}
+        >
           <i className="bi-trash text-xl" />
           {t("delete")}
         </Button>
