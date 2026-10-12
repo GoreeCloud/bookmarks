@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useRef, useState } from "react";
 import useLinkStore from "@/store/links";
 import Modal from "../Modal";
 import { Button } from "@/components/ui/button";
@@ -19,27 +19,40 @@ export default function BulkDeleteLinksModal({
   const { t } = useTranslation();
   const { clearSelected } = useLinkStore();
   const selectionCount = selectedLinkIds.length;
+  const deletingRef = useRef(false);
+  const [deleting, setDeleting] = useState(false);
 
   const deleteLinksById = useBulkDeleteLinks();
 
   const deleteLink = async () => {
-    if (selectedLinkIds.length === 0) return;
+    // Guard synchronously against two destructive requests before React renders.
+    if (deletingRef.current || selectedLinkIds.length === 0) return;
+    deletingRef.current = true;
+    setDeleting(true);
+
+    const ids = [...selectedLinkIds];
     const load = toast.loading(t("deleting"));
-    const ids = selectedLinkIds;
+    let succeeded = false;
+    try {
+      await deleteLinksById.mutateAsync(ids);
+      succeeded = true;
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : t("delete_failed", { defaultValue: "Unable to delete bookmarks" })
+      );
+    } finally {
+      toast.dismiss(load);
+      deletingRef.current = false;
+      setDeleting(false);
+    }
 
-    await deleteLinksById.mutateAsync(ids, {
-      onSettled: (data, error) => {
-        toast.dismiss(load);
-
-        if (error) {
-          toast.error(error.message);
-        } else {
-          clearSelected();
-          onClose();
-          toast.success(t("deleted"));
-        }
-      },
-    });
+    if (succeeded) {
+      clearSelected();
+      onClose();
+      toast.success(t("deleted"));
+    }
   };
 
   return (
@@ -70,7 +83,7 @@ export default function BulkDeleteLinksModal({
           className="ml-auto"
           variant="destructive"
           onClick={deleteLink}
-          disabled={selectionCount === 0}
+          disabled={deleting || selectionCount === 0}
         >
           <i className="bi-trash text-xl" />
           {t("delete")}
