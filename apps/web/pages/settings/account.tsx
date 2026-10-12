@@ -323,6 +323,19 @@ const Page: NextPageWithLayout = () => {
                   <p>{t("export_data")}</p>
                 </div>
               </Link>
+              <Link
+                className="w-fit mt-2 block"
+                href="/api/v1/migration?format=html"
+                aria-label="Download browser-compatible HTML bookmarks"
+              >
+                <div className="select-none relative duration-200 rounded-lg text-sm text-center w-fit flex justify-center items-center gap-2 bg-neutral-content text-base-content hover:bg-neutral-content/80 border border-neutral/30 h-10 px-4 py-2">
+                  <i className="bi-cloud-download text-xl duration-100" aria-hidden="true"></i>
+                  <span>Export bookmarks (HTML)</span>
+                </div>
+              </Link>
+              <p className="mt-2 text-xs opacity-75">
+                HTML includes browser bookmarks only. Use JSON to preserve notes and pinned links.
+              </p>
             </div>
           </div>
         </div>
