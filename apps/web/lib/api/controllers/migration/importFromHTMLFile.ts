@@ -271,15 +271,12 @@ const createLink = async (
 
 function processNodes(nodes: Node[]) {
   const findAndProcessDL = (node: Node) => {
-    if (node.type === "element" && node.tagName === "dl") {
+    if (node.type !== "element") return;
+    if (node.tagName === "dl") {
       processDLChildren(node);
-    } else if (
-      node.type === "element" &&
-      node.children &&
-      node.children.length
-    ) {
-      node.children.forEach((child) => findAndProcessDL(child));
     }
+    // Description associations also occur inside nested folder lists.
+    node.children.forEach(findAndProcessDL);
   };
 
   const processDLChildren = (dlNode: Element) => {
