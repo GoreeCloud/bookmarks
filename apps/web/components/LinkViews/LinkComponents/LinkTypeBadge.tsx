@@ -1,23 +1,15 @@
 import { LinkIncludingShortenedCollectionAndTags } from "@linkwarden/types/global";
 import Link from "next/link";
-import React, { useEffect, useState } from "react";
+import React from "react";
+import safeExternalUrl from "@/lib/client/safeExternalUrl";
 
 function LinkTypeBadge({
   link,
 }: {
   link: LinkIncludingShortenedCollectionAndTags;
 }) {
-  const [url, setUrl] = useState("");
-
-  useEffect(() => {
-    if (link.type === "url" && link.url) {
-      try {
-        setUrl(new URL(link.url).host.toLowerCase());
-      } catch (error) {
-        console.log(error);
-      }
-    }
-  }, [link]);
+  const externalUrl = safeExternalUrl(link.url);
+  const host = externalUrl ? new URL(externalUrl).host.toLowerCase() : "";
 
   const typeIcon = () => {
     switch (link.type) {
@@ -30,22 +22,21 @@ function LinkTypeBadge({
     }
   };
 
-  return link.url && url ? (
+  return externalUrl && host ? (
     <Link
-      href={link.url || ""}
+      href={externalUrl}
       target="_blank"
+      rel="noopener noreferrer"
       title={link.url || ""}
-      onClick={(e) => {
-        e.stopPropagation();
-      }}
+      onClick={(e) => e.stopPropagation()}
       className="flex gap-1 item-center select-none text-neutral hover:opacity-70 duration-100 max-w-full w-fit"
     >
       <i className="bi-link-45deg text-lg leading-none"></i>
-      <p className="text-xs truncate">{url}</p>
+      <p className="text-xs truncate">{host}</p>
     </Link>
   ) : (
     <div className="flex gap-1 item-center select-none text-neutral duration-100 max-w-full w-fit">
-      <i className={typeIcon() + ` text-md leading-none`}></i>
+      <i className={typeIcon() + " text-md leading-none"}></i>
       <p className="text-xs truncate">{link.type}</p>
     </div>
   );

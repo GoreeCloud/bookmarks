@@ -26,6 +26,7 @@ import toast from "react-hot-toast";
 import CollectionSelection from "./InputSelect/CollectionSelection";
 import TagSelection from "./InputSelect/TagSelection";
 import unescapeString from "@/lib/client/unescapeString";
+import safeExternalUrl from "@/lib/client/safeExternalUrl";
 import IconPopover from "./IconPopover";
 import TextInput from "./TextInput";
 import usePermissions from "@/hooks/usePermissions";
@@ -63,6 +64,7 @@ export default function LinkDetails({
     setLink(activeLink);
   }, [activeLink]);
 
+  const externalUrl = safeExternalUrl(link.url);
   const permissions = usePermissions(link.collection.id as number);
 
   const { t } = useTranslation();
@@ -311,9 +313,18 @@ export default function LinkDetails({
 
               <div className="relative">
                 <div className="rounded-md p-2 bg-base-200 hide-scrollbar overflow-x-auto whitespace-nowrap flex justify-between items-center gap-2 pr-14">
-                  <Link href={link.url} title={link.url} target="_blank">
-                    {link.url}
-                  </Link>
+                  {externalUrl ? (
+                    <Link
+                      href={externalUrl}
+                      title={link.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {link.url}
+                    </Link>
+                  ) : (
+                    <span className="text-neutral">{link.url}</span>
+                  )}
                   <div className="absolute right-0 px-2 bg-base-200">
                     <CopyButton text={link.url} />
                   </div>
