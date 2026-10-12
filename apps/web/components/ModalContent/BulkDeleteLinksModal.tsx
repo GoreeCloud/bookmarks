@@ -56,7 +56,7 @@ export default function BulkDeleteLinksModal({
   };
 
   return (
-    <Modal toggleModal={onClose}>
+    <Modal toggleModal={onClose} dismissible={!deleting}>
       <p className="text-xl font-thin text-red-500">
         {selectionCount === 1
           ? t("delete_link")
