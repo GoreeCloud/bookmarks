@@ -8,7 +8,7 @@ function LinkTypeBadge({
 }: {
   link: LinkIncludingShortenedCollectionAndTags;
 }) {
-  const externalUrl = link.type === "url" ? safeExternalUrl(link.url) : null;
+  const externalUrl = safeExternalUrl(link.url);
   const host = externalUrl ? new URL(externalUrl).host.toLowerCase() : "";
 
   const typeIcon = () => {
