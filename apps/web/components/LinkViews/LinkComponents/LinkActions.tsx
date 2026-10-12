@@ -59,7 +59,8 @@ export default function LinkActions({
       await updateArchiveMutation.mutateAsync(link.id as number);
       toast.success(t("link_being_archived"));
     } catch (error: any) {
-      toast.error(error.message);
+      toast.error(error instanceof Error ? error.message : t("error"));
+      throw error;
     } finally {
       toast.dismiss(load);
     }
