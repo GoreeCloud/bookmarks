@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en" data-theme="dark" data-gc-accent="iris">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#10131e">
+<meta name="description" content="GoreeCloud Bookmarks — your private library of the internet.">
+<title>GoreeCloud Bookmarks</title>
+<link rel="stylesheet" href="/styles.css"><script defer src="/app.js"></script>
+</head>
+<body>
+<div class="ambient" aria-hidden="true"></div>
+<div class="shell">
+<aside class="sidebar">
+  <div class="brand"><span class="brandmark" aria-hidden="true">✦</span><span><strong>GoreeCloud</strong><small>BOOKMARKS</small></span></div>
+  <div class="sidebar-label">WORKSPACE</div>
+  <nav class="navigation" aria-label="Library views">
+    <button class="nav-item active" data-view="all" aria-current="page"><span class="nav-symbol">▦</span> All bookmarks <span class="count" id="count-all">0</span></button>
+    <button class="nav-item" data-view="favorites"><span class="nav-symbol">✧</span> Favorites</button>
+    <button class="nav-item" data-view="unread"><span class="nav-symbol">◉</span> Read later</button>
+    <button class="nav-item" data-view="trash"><span class="nav-symbol">⌫</span> Recently deleted</button>
+  </nav>
+  <div class="collections-header"><span class="sidebar-label">COLLECTIONS</span><button id="new-collection" class="small-icon" aria-label="Add collection" title="Add collection">＋</button></div>
+  <nav id="collections" class="navigation" aria-label="Collections"></nav>
+  <div class="sidebar-bottom">
+    <div class="sync-indicator"><span class="sync-dot"></span> Private · Self-hosted</div>
+    <button id="theme-switch" class="sidebar-settings">◐ <span>Switch appearance</span></button>
+  </div>
+</aside>
+<main class="content">
+  <header class="topbar">
+    <div class="breadcrumb"><span class="breadcrumb-soft">Your workspace</span><span class="slash">/</span><span id="crumb">Library</span></div>
+    <div class="top-actions"><button id="lock-workspace" class="quiet-button lock-action" type="button" aria-label="Lock this tab" title="Lock this tab">🔒 <span>Lock</span></button><button id="import-button" class="quiet-button">Import</button><details class="export-dropdown"><summary class="quiet-button">Export ↓</summary><div class="export-menu"><button id="export-json" type="button">Complete JSON</button><button id="export-html" type="button">Browser HTML</button></div></details><button id="new-bookmark" class="primary-button">＋ Save link</button></div>
+  </header>
+  <section class="intro">
+    <span class="eyebrow">✦ &nbsp; YOUR PERSONAL KNOWLEDGE SPACE</span>
+    <div class="intro-row"><div><h1>Everything worth <em>keeping.</em></h1><p>One beautiful place for the links, ideas and discoveries that matter.</p></div><div class="intro-ornament" aria-hidden="true">✧</div></div>
+  </section>
+  <section class="stats" aria-label="Library overview">
+    <div class="stat"><span>Saved links</span><strong id="stat-saved">0</strong><small>in your library</small></div>
+    <div class="stat"><span>Read later</span><strong id="stat-unread">0</strong><small>waiting to explore</small></div>
+    <div class="stat"><span>Collections</span><strong id="stat-collections">0</strong><small>spaces to explore</small></div>
+  </section>
+  <section class="library-panel">
+    <div class="library-heading"><div><div class="section-kicker">YOUR LIBRARY</div><h2 id="view-heading">All bookmarks</h2></div><span id="result-count" class="result-count"></span></div>
+    <div class="search-row">
+      <div class="mobile-collection-controls"><label class="mobile-collection-picker">Collection<select id="mobile-collections" aria-label="Choose collection"><option value="all">All collections</option></select></label><button id="mobile-new-collection" type="button" class="quiet-button" aria-label="Create new collection">＋ New</button></div>
+      <label class="search-box"><span aria-hidden="true">⌕</span><span class="sr-only">Search saved links</span><input id="search" type="search" autocomplete="off" placeholder="Search titles, tags, URLs, notes…"></label>
+      <label class="sort-box">Sort <select id="sort"><option value="newest">Newest</option><option value="oldest">Oldest</option><option value="title">Title</option></select></label>
+      <div class="layout-switch" role="group" aria-label="Layout"><button id="grid-view" class="layout-active" aria-label="Grid layout" aria-pressed="true">▦</button><button id="list-view" aria-label="List layout" aria-pressed="false">☰</button></div>
+    </div>
+    <div id="active-tag-filter" class="active-filter" hidden><span>Showing tag <strong id="active-tag-label"></strong></span><button id="clear-tag-filter" type="button" class="filter-clear" aria-label="Clear tag filter">Clear filter ×</button></div>
+    <div id="items" class="bookmark-grid"></div>
+    <div id="empty" class="empty" hidden><div class="empty-icon" aria-hidden="true">✦</div><h3>Space for something wonderful.</h3><p id="empty-message">Save your first link to begin building your library.</p><button id="empty-add" class="primary-button">＋ Save your first link</button></div>
+  </section>
+  <footer>GoreeCloud Bookmarks <span>·</span> Private by design <span>·</span> Self-hosted freedom</footer>
+</main>
+</div>
+<nav class="mobile-nav" aria-label="Mobile navigation"><button data-mobile-view="all">Library</button><button data-mobile-view="favorites">Favorites</button><button data-mobile-view="unread">Read later</button><button id="mobile-theme">◐ Theme</button><button id="mobile-add">＋ Save</button></nav>
+<dialog id="bookmark-dialog" class="modal"><form id="bookmark-form">
+  <div class="modal-head"><div><span class="section-kicker">SAVE TO YOUR SPACE</span><h2 id="dialog-title">New bookmark</h2></div><button type="button" class="close-button" data-close="bookmark-dialog" aria-label="Close dialog">×</button></div>
+  <label>Website URL<input name="url" type="url" placeholder="https://example.com/article" required maxlength="4096"></label>
+  <label>Title<input name="title" placeholder="A great find" maxlength="200"></label>
+  <label>Description<input name="description" maxlength="1200" placeholder="A short summary"></label>
+  <label>Tags <span class="label-hint">(comma separated)</span><input name="tags" placeholder="design, research, reading"></label>
+  <label>Collection<select name="collectionId" id="form-collection"><option value="">Inbox / no collection</option></select></label>
+  <label>Reading status<select name="status"><option value="unread">Read later</option><option value="reading">Reading</option><option value="read">Read</option></select></label>
+  <label>Personal notes<textarea name="notes" rows="3" maxlength="8000" placeholder="Why this is worth keeping…"></textarea></label>
+  <div class="modal-footer"><button type="button" class="quiet-button" data-close="bookmark-dialog">Cancel</button><button class="primary-button" type="submit">Save bookmark</button></div>
+</form></dialog>
+<dialog id="collection-dialog" class="modal"><form id="collection-form">
+  <div class="modal-head"><div><span class="section-kicker">ORGANIZE YOUR LIBRARY</span><h2 id="collection-title">New collection</h2></div><button type="button" class="close-button" data-close="collection-dialog" aria-label="Close dialog">×</button></div>
+  <label>Collection name<input name="name" maxlength="80" required placeholder="Ideas & inspiration"></label>
+  <div class="modal-footer"><button type="button" id="delete-collection" class="quiet-button danger" hidden>Delete collection</button><button type="button" class="quiet-button" data-close="collection-dialog">Cancel</button><button class="primary-button" type="submit">Save collection</button></div>
+</form></dialog>
+<dialog id="unlock-dialog" class="modal"><form id="unlock-form">
+  <div class="modal-head"><div><span class="section-kicker">PRIVATE WORKSPACE</span><h2>Unlock your library</h2></div></div>
+  <p class="muted">Enter the server operator access token to start a revocable session. The operator token is not saved in browser storage; this tab keeps only the temporary session token.</p>
+  <label>Server operator token<input id="auth-token" type="password" required minlength="24" autocomplete="off" placeholder="Your private access token"></label>
+  <p id="unlock-error" class="error-message" role="alert"></p>
+  <div class="modal-footer"><button type="submit" class="primary-button">Unlock library →</button></div>
+</form></dialog>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+<input id="file-import" type="file" accept=".json,.html,text/html,application/json" hidden>
+</body></html>

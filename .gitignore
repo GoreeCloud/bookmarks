@@ -1,0 +1,10 @@
+node_modules/
+data/
+.env
+*.log
+.DS_Store
+backups/
+
+# Optional Python Playwright regression harness
+__pycache__/
+*.pyc
