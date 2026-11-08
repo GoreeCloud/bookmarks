@@ -1,6 +1,6 @@
 # GoreeCloud Bookmarks — Opt-in SQLite runtime and offline recovery
 
-**Version:** v0.1.20 development preview, November 8, 2026. **Not** a production migration, deployment, default storage switch, encrypted vault, or Stable release. Node 22's built-in `node:sqlite` API remains experimental; Node 24 is tested by CI.
+**Version:** v0.1.21 development preview, November 8, 2026. **Not** a production migration, deployment, default storage switch, encrypted vault, or Stable release. Node 22's built-in `node:sqlite` API remains experimental; Node 24 is tested by CI.
 
 ## Safe use with a disposable library
 
@@ -27,6 +27,8 @@ npm run sqlite-migrate -- inspect ./new-test-library.sqlite
 Before any eventual real-library cutover, stop the JSON writer, verify its snapshot and backup, perform an independent migration against an approved copy, and test both recovery directions. This document does not authorize migration or deletion of real data.
 
 ## Runtime semantics and consistency
+
+**SQLite file-header version policy (v0.1.21).** New databases, including offline JSON migrations, set `PRAGMA application_id=0x4743424d` (ASCII `GCBM`) and `PRAGMA user_version=1`, in addition to the existing strict metadata `schema_version=1`. Previously created v0.1.18–v0.1.20 databases with both PRAGMA values zero remain readable and writable **without being silently upgraded**. Unknown application IDs, future file versions, and mismatched combinations are rejected before use. This prepares future opt-in migrations but does **not** implement automatic schema upgrades, rollback, encryption, or approved production cutover.
 
 The v0.1.20 adapter skips unchanged-row upserts and ordinal relocation when IDs and ordering remain identical. Inserts, deletions and reorder operations still use the published v1 unique-ordinal relocation transaction. The adapter preserves the v1 JSON record model (`schema`, `bookmarks`, `collections`), the public HTTP request/response contracts and the in-process `snapshot()/mutate()` interface. It uses the same published SQLite v1 tables (`metadata`, `collections`, `bookmarks`, `tags`) and validates referenced IDs, dates, URLs, statuses and record order. Writes use an explicit SQLite `BEGIN IMMEDIATE` / `COMMIT` transaction, with `ROLLBACK` after failures. Changes to foreign keys, indexes, payloads, tag rows, order and count metadata are applied together. A failed write leaves both the cached snapshot and on-disk records unchanged; later valid writes remain possible.
 

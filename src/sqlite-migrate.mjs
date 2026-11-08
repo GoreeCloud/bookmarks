@@ -12,7 +12,11 @@ import { parseUtf8Json } from './json.mjs';
 
 const MAX_BYTES = 64 * 1024 * 1024;
 export const SQLITE_SCHEMA_VERSION = '1';
+// 'GCBM': identify databases owned by GoreeCloud Bookmarks to prevent an
+// unrelated SQLite file from being mistaken for a Bookmarks library.
+export const SQLITE_APPLICATION_ID = 0x4743424d;
 const VERSION = SQLITE_SCHEMA_VERSION;
+export const sqliteFileHeaderSql = `PRAGMA application_id=${SQLITE_APPLICATION_ID}; PRAGMA user_version=1;`;
 const sha256 = b => createHash('sha256').update(b).digest('hex');
 export const schemaSql = `
 CREATE TABLE metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL) STRICT;
@@ -75,6 +79,15 @@ export function openDb(path, readOnly = false) {
 }
 export function loadVerified(db, { queryOnly = true } = {}) {
   if (queryOnly) db.exec('PRAGMA query_only=ON');
+  const appId = db.prepare('PRAGMA application_id').get().application_id;
+  const fileVersion = db.prepare('PRAGMA user_version').get().user_version;
+  // Keep previously issued v0.1.18-v0.1.20 version-zero headers read/write
+  // compatible without altering them. All new databases have a distinct ID
+  // and file schema version; unknown or mixed headers fail closed.
+  if (!((appId === 0 && fileVersion === 0) ||
+        (appId === SQLITE_APPLICATION_ID && fileVersion === 1))) {
+    throw new Error('Unsupported SQLite application ID or file schema version');
+  }
   if (db.prepare('PRAGMA integrity_check').all().some(x=>Object.values(x)[0] !== 'ok')) throw new Error('SQLite integrity_check failed');
   if (db.prepare('PRAGMA foreign_key_check').all().length) throw new Error('SQLite foreign_key_check failed');
   const metadata = new Map(db.prepare('SELECT key,value FROM metadata').all().map(({key,value})=>[key,value]));
@@ -136,6 +149,7 @@ export async function migrateJsonToSqlite(source, destination) {
     db = openDb(temp);
     db.exec('PRAGMA journal_mode=DELETE; PRAGMA synchronous=FULL;');
     db.exec(schemaSql);
+    db.exec(sqliteFileHeaderSql);
     db.exec('BEGIN IMMEDIATE');
     try {
       const meta = db.prepare('INSERT INTO metadata(key,value) VALUES(?,?)');

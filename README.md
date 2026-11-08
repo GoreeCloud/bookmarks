@@ -2,9 +2,9 @@
 
 **Your private library of the internet.** Save it. Organize it. Preserve it. Find it. Own it.
 
-GoreeCloud Bookmarks is a privacy-first, self-hosted bookmark and read-it-later application. This repository is an **early development preview (v0.1.20)**, implementing a working first slice of the larger [feature specification](docs/FEATURE_CATALOG.md). It is not yet a complete Linkwarden/Karakeep/Raindrop.io replacement or a production-ready public service.
+GoreeCloud Bookmarks is a privacy-first, self-hosted bookmark and read-it-later application. This repository is an **early development preview (v0.1.21)**, implementing a working first slice of the larger [feature specification](docs/FEATURE_CATALOG.md). It is not yet a complete Linkwarden/Karakeep/Raindrop.io replacement or a production-ready public service.
 
-## What works in v0.1.20
+## What works in v0.1.21
 
 - **Bookmark library:** Save, edit, search and open HTTP(S) URLs; titles, descriptions, notes, tags, favorites, pinned items, timestamps and read-later status.
 - **Collections:** Create, rename, browse and delete collections; deleting a collection preserves its bookmarks in the unfiled inbox.

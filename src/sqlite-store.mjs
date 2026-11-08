@@ -8,7 +8,7 @@ import { open, stat, mkdir } from 'node:fs/promises';
 import { resolve, dirname } from 'node:path';
 import { createHash } from 'node:crypto';
 import { assertLibrary } from './schema.mjs';
-import { openDb, schemaSql, SQLITE_SCHEMA_VERSION, loadVerified } from './sqlite-migrate.mjs';
+import { openDb, schemaSql, SQLITE_SCHEMA_VERSION, sqliteFileHeaderSql, loadVerified } from './sqlite-migrate.mjs';
 
 const emptyLibrary = () => ({schema: 1, bookmarks: [], collections: []});
 const sha256 = data => createHash('sha256').update(data).digest('hex');
@@ -23,6 +23,7 @@ export function validateSqliteTarget(location) {
 
 function initialize(db) {
   db.exec(schemaSql);
+  db.exec(sqliteFileHeaderSql);
   const meta = db.prepare('INSERT INTO metadata(key,value) VALUES(?,?)');
   const virgin = emptyLibrary();
   const entries = {
