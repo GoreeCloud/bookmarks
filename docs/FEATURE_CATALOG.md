@@ -2,7 +2,7 @@
 
 **Status:** Product requirements / implementation scope. A checked capability below means a development-preview feature was implemented and tested to the extent described in VALIDATION.md; unchecked capabilities are plans and are **not** currently available.
 
-## Current implementation — v0.1.21
+## Current implementation — v0.1.22
 
 - [x] Save, edit and open web bookmarks (HTTP/HTTPS only)
 - [x] Titles, descriptions and personal notes
