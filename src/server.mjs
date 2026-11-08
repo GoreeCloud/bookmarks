@@ -8,6 +8,7 @@ import { createSessionManager } from './sessions.mjs';
 import { trustedHostPolicy } from './host.mjs';
 import { validateBindHost } from './bind.mjs';
 import { openStore } from './store.mjs';
+import { openSqliteStore, validateSqliteTarget } from './sqlite-store.mjs';
 import { acquireSingleWriterLock } from './lock.mjs';
 import { AppError, makeBookmark, makeCollection, dedupeKey, exportHtml, searchBookmarks } from './core.mjs';
 import { importBatch, importWholeFile } from './import.mjs';
@@ -24,10 +25,13 @@ if (!Number.isInteger(port) || port < 0 || port > 65535) throw new Error('Invali
 const guard = createAuthGuard(token);
 const sessions = createSessionManager();
 const hostPolicy = trustedHostPolicy(process.env.GCB_TRUSTED_HOSTS || '');
+const backend = process.env.GCB_STORAGE_BACKEND || 'json';
+if (!['json', 'sqlite'].includes(backend)) throw new Error('Unsupported GCB_STORAGE_BACKEND');
+if (backend === 'sqlite') validateSqliteTarget(process.env.GCB_DATA_FILE);
 const dataFile = process.env.GCB_DATA_FILE || './data/bookmarks.json';
 const writerLock = await acquireSingleWriterLock(dataFile);
 let store;
-try { store = await openStore(writerLock.dataFile); }
+try { store = backend === 'sqlite' ? await openSqliteStore(writerLock.dataFile) : await openStore(writerLock.dataFile); }
 catch (error) { await writerLock.release(); throw error; }
 const assetRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const staticFiles = new Map([
@@ -243,7 +247,7 @@ function shutdown() {
   if (stopping) return;
   stopping = true;
   server.close(async error => {
-    try { await writerLock.release(); }
+    try { if (store?.close) await store.close(); await writerLock.release(); }
     catch (releaseError) { console.error('Library lock release failed:', releaseError.message); process.exitCode = 1; }
     if (error) { console.error('Server shutdown failed:', error.message); process.exitCode = 1; }
   });
@@ -253,7 +257,7 @@ process.once('SIGINT', shutdown);
 server.once('error', async error => {
   console.error('Server could not listen:', error.message);
   process.exitCode = 1;
-  try { await writerLock.release(); }
+  try { if (store?.close) await store.close(); await writerLock.release(); }
   catch (releaseError) { console.error('Library lock release failed:', releaseError.message); }
 });
 server.listen(port, host, () => console.log('GoreeCloud Bookmarks listening at http://' + host + ':' + server.address().port));

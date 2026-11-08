@@ -11,9 +11,10 @@ import { assertLibrary } from './schema.mjs';
 import { parseUtf8Json } from './json.mjs';
 
 const MAX_BYTES = 64 * 1024 * 1024;
-const VERSION = '1';
+export const SQLITE_SCHEMA_VERSION = '1';
+const VERSION = SQLITE_SCHEMA_VERSION;
 const sha256 = b => createHash('sha256').update(b).digest('hex');
-const schemaSql = `
+export const schemaSql = `
 CREATE TABLE metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL) STRICT;
 CREATE TABLE collections (
   id TEXT PRIMARY KEY NOT NULL,
@@ -67,13 +68,13 @@ async function readSource(file) {
 export async function planSqliteMigration(source) {
   return (await readSource(source)).summary;
 }
-function openDb(path, readOnly = false) {
+export function openDb(path, readOnly = false) {
   const db = new DatabaseSync(path, { readOnly });
   db.exec('PRAGMA foreign_keys=ON; PRAGMA busy_timeout=2000;');
   return db;
 }
-function loadVerified(db) {
-  db.exec('PRAGMA query_only=ON');
+export function loadVerified(db, { queryOnly = true } = {}) {
+  if (queryOnly) db.exec('PRAGMA query_only=ON');
   if (db.prepare('PRAGMA integrity_check').all().some(x=>Object.values(x)[0] !== 'ok')) throw new Error('SQLite integrity_check failed');
   if (db.prepare('PRAGMA foreign_key_check').all().length) throw new Error('SQLite foreign_key_check failed');
   const metadata = new Map(db.prepare('SELECT key,value FROM metadata').all().map(({key,value})=>[key,value]));
