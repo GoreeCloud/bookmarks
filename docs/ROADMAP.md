@@ -2,7 +2,7 @@
 
 This roadmap sequences a large requested product scope into maintainable, testable releases. No phase should be labeled Stable solely because code is merged. Public deployment requires independent security and operational approval.
 
-## P0: Working private foundation (implemented locally through v0.1.17)
+## P0: Working private foundation (implemented publicly through v0.1.17; v0.1.18 storage tool under development)
 
 - Authenticated server with fail-closed literal loopback bind policy, an independent strict Host-header allowlist and minimal persistence (non-loopback binding is explicitly opt-in, not production approved).
 - Bookmark and collection CRUD, tags, notes, read status and favorites.
@@ -12,7 +12,7 @@ This roadmap sequences a large requested product scope into maintainable, testab
 
 ## P1: Hardening and trusted storage
 
-- Choose a supported SQLite/PostgreSQL persistence layer with migrations and explicit single/multi-instance support; the local JSON store flushes replacement bytes before rename and now refuses a second cooperative server using a private single-writer lock, but it is still not a multi-process database or a distributed lock.
+- An opt-in offline v0.1.18 migration tool can validate/convert JSON v1 into a new SQLite file and export JSON back, but the live server remains JSON-backed. Complete read/write SQLite service adapter, schema upgrade/rollback, power-loss/backup drills, and multi-instance decisions. Choose a supported SQLite/PostgreSQL persistence layer with migrations and explicit single/multi-instance support; the local JSON store flushes replacement bytes before rename and now refuses a second cooperative server using a private single-writer lock, but it is still not a multi-process database or a distributed lock.
 - Implement real user identities, operator-credential rotation, production session policies, secure recovery and distributed throttling. The local preview now issues individually revocable eight-hour browser/extension sessions (memory-only, capped at 32; all invalidated on restart); a lost operator secret still requires an out-of-band configuration change and restart. The v0.1.15 server rechecks session credentials before each store mutation and after slow preview-body reads; writes committed before revocation cannot be reverted. No multi-user permissions, MFA or production identity provider is implemented.
 - Complete automated backup scheduling/rotation, restore drills and failure injection (checksum-backed restore to a new file, strict v1 schema validation and recovered-server HTTP smoke test now exist locally).
 - Add database-backed pagination/indexes (bounded API search exists), accessibility checks and automated browser tests.

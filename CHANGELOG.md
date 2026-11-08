@@ -2,6 +2,12 @@
 
 Release maturity: **development preview**. Versions below describe local source snapshots, not stable public releases.
 
+## v0.1.18 — November 8, 2026 (offline SQLite migration development milestone)
+
+- Add an opt-in, dependency-free **offline-only** `node:sqlite` JSON-v1 to SQLite converter with read-only planning, strict input validation, source digest tracking, private new-destination publication, FK/PK constraints, indexable metadata and ordered payload retention, SQLite integrity checks and reversible new-file JSON export. Existing JSON HTTP store is deliberately unchanged; Node 22's SQLite API remains experimental.
+- Add six migration tests: no-write planning, lossless Unicode/IDs/tags/status/timestamp round trips, no-overwrite behavior, malformed UTF-8/duplicate IDs/dangling collection rejection, tampering detection, and 1,201-record restart/read-only inspection plus CLI coverage. Documentation clarifies this is **not** a live database migration or production adapter.
+- The v0.1.17 original source was already merged via public PR #1 to `main` and passed post-merge GitHub CI; the new v0.1.18 changes are independent and require their own GitHub CI/review acceptance.
+
 ## v0.1.17 — November 8, 2026 (local development preview)
 
 - Apply one strict, lossless UTF-8 JSON decoder to authenticated HTTP uploads, stored library startup and backup verification/restoration. Invalid byte sequences now fail closed instead of being silently replaced with Unicode replacement characters; UTF-8 JSON with Unicode titles and notes remains supported.

@@ -1,6 +1,6 @@
 {
   "name": "@goreecloud/bookmarks",
-  "version": "0.1.17",
+  "version": "0.1.18",
   "private": true,
   "type": "module",
   "license": "MIT",
@@ -13,8 +13,9 @@
     "test": "node --test",
     "backup": "node src/backup.mjs",
     "verify-backup": "node src/backup.mjs verify",
-    "check": "node --check src/server.mjs && node --check src/core.mjs && node --check src/import.mjs && node --check src/auth.mjs && node --check src/sessions.mjs && node --check src/store.mjs && node --check src/lock.mjs && node --check src/schema.mjs && node --check src/backup.mjs && node --check public/app.js && node --check extension/popup.mjs && node --check extension/helpers.mjs && node --check src/host.mjs && node --check src/bind.mjs && node --check src/json.mjs",
+    "check": "node --check src/server.mjs && node --check src/core.mjs && node --check src/import.mjs && node --check src/auth.mjs && node --check src/sessions.mjs && node --check src/store.mjs && node --check src/lock.mjs && node --check src/schema.mjs && node --check src/backup.mjs && node --check public/app.js && node --check extension/popup.mjs && node --check extension/helpers.mjs && node --check src/host.mjs && node --check src/bind.mjs && node --check src/json.mjs && node --check src/sqlite-migrate.mjs",
     "restore-backup": "node src/backup.mjs restore",
+    "sqlite-migrate": "node src/sqlite-migrate.mjs",
     "browser-session-smoke": "python tests/browser-session-smoke.py"
   }
 }

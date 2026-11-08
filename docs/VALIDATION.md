@@ -1,11 +1,18 @@
 # GoreeCloud Bookmarks — Validation and Constraints
 
-Local source verification for the updated v0.1.17 development preview, November 8, 2026.
+Local source verification for the v0.1.18 offline SQLite migration development milestone, November 8, 2026.
+
+## v0.1.18 offline SQLite migration (new)
+
+- Tested Node 22's built-in experimental `node:sqlite` module with a new read-only plan, transactionally built 0600 SQLite snapshot, `integrity_check`, `foreign_key_check`, payload-column match verification and no-overwrite JSON export. The normal server is still JSON-backed and no production data was accessed.
+- Six new tests check untouched source and preexisting destinations, Unicode/IDs/tags/record order round-trip, invalid UTF-8/duplicate IDs/dangling collections, modified SQLite indexed columns, 1,201-record new-process inspection, and all CLI commands. Migration uses only disposable test data.
+- See [Offline SQLite Migration](SQLITE_MIGRATION.md) for explicit no-cutover limits, tested runtime version and remaining crash, durability, encryption, backup and database service gates.
+- An actual unpacked Chromium extension test against a disposable 127.0.0.1 server was attempted with Chromium 144 and Playwright, but the browser returned `ERR_BLOCKED_BY_ADMINISTRATOR` on localhost navigation. No extension worker was observed. This **does not pass** real-browser acceptance; GitHub issue #2 remains open. The server itself started on loopback and was stopped, and the test profile was discarded.
 
 ## Automated checks
 
-- Node.js 22 syntax checks: passed for server, core, authentication guard, revocable sessions, store, schema, backup, browser client, and Chromium extension modules.
-- Forty-six tests: passed. Coverage includes unsafe URL rejection, tracking URL cleaning, input limits, tag normalization, duplicate normalization, HTML export escaping, serialized atomic JSON persistence, rollback of rejected mutations, verified SHA-256 snapshot backups, strict v1 library validation, no-overwrite restore CLI, separate-server authenticated recovery, HTTP requests, collection/bookmark CRUD, import deduplication, trash/restore and security headers.
+- Node.js 22 syntax checks: passed for server, core, authentication guard, revocable sessions, store, schema, backup, SQLite migration, browser client, and Chromium extension modules.
+- Fifty-two tests: passed (46 existing plus six offline SQLite migration tests). Coverage includes unsafe URL rejection, tracking URL cleaning, input limits, tag normalization, duplicate normalization, HTML export escaping, serialized atomic JSON persistence, rollback of rejected mutations, verified SHA-256 snapshot backups, strict v1 library validation, no-overwrite restore CLI, separate-server authenticated recovery, HTTP requests, collection/bookmark CRUD, import deduplication, trash/restore and security headers.
 - Browser client in offline/mocked Chromium: desktop and mobile rendered with sample bookmarks, and desktop interaction flows (unlock, create collection, save bookmark, search, mark read, soft-delete, restore) plus mobile collection selection completed with no JavaScript errors. These use mock API responses; the separately tested HTTP API runs under Node fetch.
 
 ## v0.1.17 strict UTF-8 integrity checks
