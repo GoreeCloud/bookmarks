@@ -1,6 +1,7 @@
+import { createHash } from 'node:crypto';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, writeFile, stat, access, unlink } from 'node:fs/promises';
+import { mkdtemp, readFile, writeFile, stat, access, unlink, symlink, chmod } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { spawn } from 'node:child_process';
@@ -252,4 +253,38 @@ test('SQLite v1 legacy headers remain readable but unknown/mixed file versions f
   const stillThere = new DatabaseSync(f.db,{readOnly:true});
   try { assert.equal(stillThere.prepare('SELECT COUNT(*) AS n FROM bookmarks').get().n,1); }
   finally {stillThere.close();}
+});
+
+
+test('SQLite startup rejects untrusted foreign header and malformed schema without writing either file',async()=>{
+  for (const kind of ['foreign','malformed']) {
+    const f=await sandbox();
+    const seed=new DatabaseSync(f.db);
+    try {
+      if (kind==='foreign') {
+        seed.exec("CREATE TABLE unrelated(value TEXT); INSERT INTO unrelated VALUES ('personal'); PRAGMA application_id=999; PRAGMA user_version=4;");
+      } else {
+        seed.exec("CREATE TABLE unrelated(value TEXT); INSERT INTO unrelated VALUES ('preserve');");
+      }
+    } finally {seed.close();}
+    await chmod(f.db,0o600);
+    const checksum=x=>createHash('sha256').update(x).digest('hex');
+    const original=await readFile(f.db);
+    await assert.rejects(openSqliteStore(f.db),kind==='foreign'?/application ID or file schema version/:/no such table: metadata/);
+    assert.equal(checksum(await readFile(f.db)),checksum(original),'rejected database bytes must remain identical');
+    await assert.rejects(access(f.db+'-journal'),{code:'ENOENT'});
+    await assert.rejects(access(f.db+'-wal'),{code:'ENOENT'});
+  }
+});
+
+test('SQLite startup refuses symlink files without altering their real target',async()=>{
+  const f=await sandbox();const real=join(f.dir,'real.sqlite');
+  let store=await openSqliteStore(real);
+  await store.mutate(s=>{s.collections.push(c());s.bookmarks.push(b());});
+  await store.close();
+  await symlink(real,f.db);
+  const original=await readFile(real);
+  await assert.rejects(openSqliteStore(f.db),/private regular file/);
+  assert.deepEqual(await readFile(real),original);
+  assert.equal((await inspectSqlite(real)).data.bookmarks.length,1);
 });

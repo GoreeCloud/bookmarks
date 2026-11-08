@@ -1,6 +1,13 @@
 # GoreeCloud Bookmarks — Validation and Constraints
 
-Local source verification for the v0.1.21 SQLite compatibility and header-integrity milestone, November 8, 2026.
+Local source verification for the v0.1.22 SQLite startup preflight milestone, November 8, 2026. Earlier verification records remain below.
+
+## v0.1.22 SQLite preflight and failure cleanup
+
+- `npm run check` and **70/70 local Node tests** passed.
+- Existing SQLite files are validated via a read-only handle before writable open/journal changes. Test cases seed a foreign file with application/version markers and a malformed file without the Bookmarks schema, assert startup refusal, compare SHA-256 bytes before/after and verify no SQLite `-journal` or `-wal` files are created.
+- Another test verifies direct symlink aliases are refused and the real source database bytes remain unchanged. Normal JSON behavior and prior SQLite tests remain passing.
+- Limitation: this does not mitigate unrelated filesystem writers outside the canonical single-writer lock, guarantee full power-loss recoverability, or establish a production migration gate.
 
 ## v0.1.21 SQLite file-header identity and version guard
 

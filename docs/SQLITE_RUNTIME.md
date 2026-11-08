@@ -1,6 +1,6 @@
 # GoreeCloud Bookmarks — Opt-in SQLite runtime and offline recovery
 
-**Version:** v0.1.21 development preview, November 8, 2026. **Not** a production migration, deployment, default storage switch, encrypted vault, or Stable release. Node 22's built-in `node:sqlite` API remains experimental; Node 24 is tested by CI.
+**Version:** v0.1.22 development preview, November 8, 2026. **Not** a production migration, deployment, default storage switch, encrypted vault, or Stable release. Node 22's built-in `node:sqlite` API remains experimental; Node 24 is tested by CI.
 
 ## Safe use with a disposable library
 
@@ -25,6 +25,12 @@ npm run sqlite-migrate -- inspect ./new-test-library.sqlite
 ```
 
 Before any eventual real-library cutover, stop the JSON writer, verify its snapshot and backup, perform an independent migration against an approved copy, and test both recovery directions. This document does not authorize migration or deletion of real data.
+
+## v0.1.22 SQLite startup preflight
+
+When an existing SQLite database is selected, the adapter now opens it **read-only first** and checks application/file-version headers, payload/schema integrity, foreign keys and record relationships before opening a writable handle or setting its journal mode. Corrupt or foreign database files are rejected without a SQLite journal-mode change. A direct symlink library path is rejected. The server continues to hold its canonical single-writer lock during startup. New empty database initialization failures remove only the temporary first-startup file created by this operation when its inode is unchanged.
+
+These checks are defensive development safeguards, not permission to open arbitrary untrusted databases, migrate a personal library, or enable remote access. No automatic schema upgrade or production cutover is implemented.
 
 ## Runtime semantics and consistency
 

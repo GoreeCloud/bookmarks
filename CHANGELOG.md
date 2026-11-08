@@ -2,6 +2,13 @@
 
 Release maturity: **development preview**. Versions below describe development milestones, not Stable releases. GitHub commits and CI must be verified independently.
 
+## v0.1.22 — November 8, 2026 (preflight safety for SQLite startup)
+
+- Existing SQLite database files undergo **read-only integrity, schema, application ID, foreign key and payload verification before any writable SQLite connection or journal-mode configuration**. An unrelated/corrupt database with a `.sqlite` filename is rejected without changes.
+- Symlinked SQLite library paths are refused at the adapter boundary; the server already resolves a canonical path under its exclusive writer lock. Failed initialization removes only the first-startup file it created, if its inode is unchanged.
+- Two new regression tests verify foreign/malformed files remain byte-for-byte unchanged with no journal side effects, and symlink aliases cannot be opened directly. **70/70 local Node tests pass**; the default JSON backend and application APIs remain unchanged.
+- This does not substitute for stronger filesystem isolation, a production identity/TLS gateway, real power-loss testing, schema upgrade support or approval to cut over an existing library.
+
 ## v0.1.21 — November 8, 2026 (SQLite file-header identity and forward-compatibility guard)
 
 - Mark newly initialized and offline-migrated SQLite files with `application_id=0x4743424d` (ASCII `GCBM`) and `user_version=1`. Retain compatibility with existing v0.1.20 legacy files containing zero-valued headers, without silently rewriting them.

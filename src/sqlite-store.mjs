@@ -4,7 +4,7 @@
  * the server's canonical-file sidecar lock still provides fail-closed startup.
  * No implicit JSON migration, auto-restoration, replication or encryption.
  */
-import { open, stat, mkdir } from 'node:fs/promises';
+import { open, lstat, mkdir, unlink } from 'node:fs/promises';
 import { resolve, dirname } from 'node:path';
 import { createHash } from 'node:crypto';
 import { assertLibrary } from './schema.mjs';
@@ -119,12 +119,24 @@ export async function openSqliteStore(location) {
     fresh = true;
     await handle.close();
   } catch (e) { if (e.code !== 'EEXIST') throw e; }
-  const info = await stat(file);
+  const info = await lstat(file);
   if (!info.isFile() || info.mode & 0o077) {
     throw new Error('SQLite library must be a private regular file (mode 0600)');
   }
   let db;
   try {
+    // A supplied existing database is untrusted. Before *any* writable SQLite
+    // connection or journal-mode PRAGMA, verify its header, schema, relationships
+    // and payloads using a read-only handle. A foreign/corrupt file must not be
+    // modified just because it has a .sqlite/.db filename and private mode.
+    // Our caller's canonical writer lock prevents cooperating processes from
+    // changing this file between preflight and writable open. Uncooperative
+    // external modifications remain outside the single-writer guarantee.
+    if (!fresh) {
+      const check = openDb(file, true);
+      try { loadVerified(check); }
+      finally { check.close(); }
+    }
     db = openDb(file);
     db.exec('PRAGMA journal_mode=DELETE; PRAGMA synchronous=EXTRA;');
     if (fresh) initialize(db);
@@ -168,6 +180,14 @@ export async function openSqliteStore(location) {
     };
   } catch (e) {
     if (db) { try { db.close(); } catch { /* fail closed */ } }
+    // Do not leave a broken zero-byte candidate from a failed first startup.
+    // Never delete a pre-existing database, including a corrupt or foreign one.
+    if (fresh) {
+      try {
+        const current = await lstat(file);
+        if (current.dev === info.dev && current.ino === info.ino) await unlink(file);
+      } catch { /* preserve the startup error */ }
+    }
     throw e;
   }
 }
