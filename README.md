@@ -2,9 +2,9 @@
 
 **Your private library of the internet.** Save it. Organize it. Preserve it. Find it. Own it.
 
-GoreeCloud Bookmarks is a privacy-first, self-hosted bookmark and read-it-later application. This repository is an **early development preview (v0.1.17)**, implementing a working first slice of the larger [feature specification](docs/FEATURE_CATALOG.md). It is not yet a complete Linkwarden/Karakeep/Raindrop.io replacement or a production-ready public service.
+GoreeCloud Bookmarks is a privacy-first, self-hosted bookmark and read-it-later application. This repository is an **early development preview (v0.1.18)**, implementing a working first slice of the larger [feature specification](docs/FEATURE_CATALOG.md). It is not yet a complete Linkwarden/Karakeep/Raindrop.io replacement or a production-ready public service.
 
-## What works in v0.1.17
+## What works in v0.1.18
 
 - **Bookmark library:** Save, edit, search and open HTTP(S) URLs; titles, descriptions, notes, tags, favorites, pinned items, timestamps and read-later status.
 - **Collections:** Create, rename, browse and delete collections; deleting a collection preserves its bookmarks in the unfiled inbox.
@@ -75,6 +75,10 @@ If a start fails with **Library is locked**, inspect the `.lock` JSON metadata a
 **Security boundaries:** A private sidecar lock (`GCB_DATA_FILE.lock`) now prevents cooperative server processes from writing the same canonical JSON library simultaneously. This is deliberately single-writer, not a multi-process database or a distributed lock. Do not manually remove a lock while any writer might still run. Do not expose the Node HTTP server directly on the public internet. For remote access, place it behind a properly configured **HTTPS reverse proxy** with additional authentication/controls as appropriate. Never store your real access token in the repository, a public URL, or logs. The operator access token is entered for each unlock and is **not** stored by the browser or extension. Browser `sessionStorage` retains only a server-issued, revocable eight-hour session; extension `chrome.storage.session` retains only its independent session. Lock/Forget clears local state first and attempts remote revocation, but network failure can leave a session active until expiry, and already-accepted server requests may complete. All sessions are cleared on server restart. The operator token is **not revocable through the session API**; rotate `GCB_AUTH_TOKEN` and restart the server to invalidate a compromised operator credential. A legacy programmatic client may still authenticate directly with that operator token. The service does **not** currently provide individual user identities, granular sharing authorization, per-user request quotas, at-rest encryption, encrypted backups or production-grade audit logs. It limits failed bearer-token authentication attempts per direct connection IP in memory (10 failures per minute, then HTTP 429 with Retry-After); it does not substitute for reverse-proxy protection or a production identity provider.
 
 Saved web links are treated as untrusted data. The server does not automatically visit saved URLs, preventing introduction of a generic SSRF-capable fetcher at this stage. Stored titles and notes are inserted into the interface as text, not parsed as HTML. User-provided links are constrained to HTTP(S).
+
+### Offline SQLite migration preview (not activated)
+
+A new opt-in **offline** `npm run sqlite-migrate -- plan|migrate|inspect|export` tool can validate a JSON-v1 source, create a private **new** SQLite snapshot with indexed collections, bookmarks, tags, and metadata, check database integrity, and export a JSON-v1 copy into another **new** file. It does **not** change the running server or its JSON storage. The built-in `node:sqlite` API is experimental on Node 22; source size is limited to 64 MiB and any real cutover requires independent recovery testing and approval. See [Offline SQLite Migration](docs/SQLITE_MIGRATION.md) for commands, no-overwrite behavior, limits, and restoration guidance.
 
 ## API reference
 
