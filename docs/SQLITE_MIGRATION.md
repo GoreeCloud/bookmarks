@@ -28,6 +28,8 @@ Review the count, IDs, collection associations, text, tags and timestamps before
 
 ## SQLite schema and integrity checks
 
+New files created by the v0.1.21 tools carry application ID `0x4743424d` (`GCBM`) and `PRAGMA user_version=1`, in addition to the metadata `schema_version=1`. Earlier v0.1.20 databases with both header values at zero remain compatible and are not silently modified. Unknown or inconsistent header values fail closed; there is **no automatic schema upgrade**.
+
 The SQLite file contains `metadata`, `collections`, `bookmarks`, and `tags` tables, with version metadata, primary keys, foreign-key constraints, ordered row positions, validated status/boolean fields, and indexes on collection, read status, trash timestamp, creation time, and tag. Each record also retains a full JSON payload so future migration steps can recover unknown noncritical fields instead of silently erasing them. Readback compares every payload with the indexed columns and original JSON object, rejecting mismatches. This is a snapshot representation; indexed and payload values are **not a write-through runtime contract**.
 
 Migration stages rows in a private 0600 file on the destination filesystem in a single SQLite transaction (`foreign_keys=ON`, `journal_mode=DELETE`, `synchronous=FULL`). The candidate is reopened for `integrity_check`, `foreign_key_check`, schema/data validation, counts, and exact JSON model comparison. The source SHA-256 is checked again before the candidate is atomically published via no-overwrite hard-link creation. Temporary artifacts are cleaned on failure. JSON export uses the same private-temp plus no-overwrite publication pattern.

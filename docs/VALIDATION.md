@@ -1,6 +1,11 @@
 # GoreeCloud Bookmarks — Validation and Constraints
 
-Local source verification for the v0.1.20 SQLite lock and write-efficiency milestone, November 8, 2026.
+Local source verification for the v0.1.21 SQLite compatibility and header-integrity milestone, November 8, 2026.
+
+## v0.1.21 SQLite file-header identity and version guard
+
+- `npm run check` and **68/68 local Node tests** passed with Node 22.16.0. The new tests verify application ID and file schema version on new and offline-migrated databases; backward-compatible zero-header v0.1.20 files are read without mutation, while future versions and foreign/mixed headers are rejected.
+- These checks are non-destructive disposable tests, not real-library migration, crash/power-loss certification, encryption or rollback of future schema upgrades. JSON remains default and the SQLite backend stays explicitly opt-in. GitHub CI and merge require independent readback.
 
 ## v0.1.20 offline backup canonical lock and unchanged-row efficiency
 

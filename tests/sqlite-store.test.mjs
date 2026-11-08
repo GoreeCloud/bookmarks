@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { spawn } from 'node:child_process';
 import { DatabaseSync } from 'node:sqlite';
 import { openSqliteStore, validateSqliteTarget } from '../src/sqlite-store.mjs';
-import { migrateJsonToSqlite, inspectSqlite, exportSqliteToJson } from '../src/sqlite-migrate.mjs';
+import { migrateJsonToSqlite, inspectSqlite, exportSqliteToJson, SQLITE_APPLICATION_ID } from '../src/sqlite-migrate.mjs';
 const timestamp='2026-11-08T12:00:00.000Z';
 const c=(id='c1')=>({id,name:`Research ${id}`,createdAt:timestamp});
 const b=(id='b1',collectionId='c1')=>({id,url:`https://example.net/${id}`,title:`書籍 ${id}`,
@@ -199,4 +199,57 @@ test('single-record updates leave unrelated SQLite rows untouched and reorders s
     assert.deepEqual(store.snapshot(), persisted, 'failed reorder must not change cached data');
     assert.deepEqual((await inspectSqlite(f.db)).data, persisted, 'failed reorder must roll back on disk');
   } finally { await store.close(); }
+});
+
+// Preserve the pre-v0.1.21 legacy header while marking all newly created files.
+// Unknown/mixed headers must never trigger an implicit schema upgrade or write.
+test('new SQLite libraries carry application identity and v1 file-header version', async () => {
+  const f = await sandbox();
+  const store = await openSqliteStore(f.db);
+  await store.close();
+  const db = new DatabaseSync(f.db, {readOnly:true});
+  try {
+    assert.equal(db.prepare('PRAGMA application_id').get().application_id, SQLITE_APPLICATION_ID);
+    assert.equal(db.prepare('PRAGMA user_version').get().user_version, 1);
+  } finally {db.close();}
+  const migrated = await sandbox();
+  await writeFile(migrated.json, JSON.stringify({schema:1,collections:[c()],bookmarks:[b()]}));
+  await migrateJsonToSqlite(migrated.json,migrated.db);
+  const exported = new DatabaseSync(migrated.db,{readOnly:true});
+  try {
+    assert.equal(exported.prepare('PRAGMA application_id').get().application_id, SQLITE_APPLICATION_ID);
+    assert.equal(exported.prepare('PRAGMA user_version').get().user_version,1);
+  } finally {exported.close();}
+  assert.equal((await inspectSqlite(migrated.db)).data.bookmarks[0].id,'b1');
+});
+
+test('SQLite v1 legacy headers remain readable but unknown/mixed file versions fail closed', async () => {
+  const f = await sandbox();
+  let store = await openSqliteStore(f.db);
+  await store.mutate(s => s.bookmarks.push(b('b-legacy',null)));
+  await store.close();
+  const marker = new DatabaseSync(f.db);
+  try {marker.exec('PRAGMA application_id=0; PRAGMA user_version=0;');}
+  finally {marker.close();}
+  assert.equal((await inspectSqlite(f.db)).data.bookmarks[0].id,'b-legacy');
+  store = await openSqliteStore(f.db);
+  await store.close();
+  const oldHeader = new DatabaseSync(f.db);
+  try {
+    assert.equal(oldHeader.prepare('PRAGMA application_id').get().application_id,0);
+    assert.equal(oldHeader.prepare('PRAGMA user_version').get().user_version,0);
+    oldHeader.exec('PRAGMA user_version=2;');
+  } finally {oldHeader.close();}
+  await assert.rejects(inspectSqlite(f.db),/application ID or file schema version/);
+  await assert.rejects(openSqliteStore(f.db),/application ID or file schema version/);
+  const invalid = new DatabaseSync(f.db);
+  try {
+    assert.equal(invalid.prepare('PRAGMA user_version').get().user_version,2);
+    invalid.exec('PRAGMA user_version=0; PRAGMA application_id=9;');
+  } finally {invalid.close();}
+  await assert.rejects(inspectSqlite(f.db),/application ID or file schema version/);
+  await assert.rejects(openSqliteStore(f.db),/application ID or file schema version/);
+  const stillThere = new DatabaseSync(f.db,{readOnly:true});
+  try { assert.equal(stillThere.prepare('SELECT COUNT(*) AS n FROM bookmarks').get().n,1); }
+  finally {stillThere.close();}
 });

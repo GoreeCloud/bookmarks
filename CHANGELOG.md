@@ -2,6 +2,12 @@
 
 Release maturity: **development preview**. Versions below describe development milestones, not Stable releases. GitHub commits and CI must be verified independently.
 
+## v0.1.21 — November 8, 2026 (SQLite file-header identity and forward-compatibility guard)
+
+- Mark newly initialized and offline-migrated SQLite files with `application_id=0x4743424d` (ASCII `GCBM`) and `user_version=1`. Retain compatibility with existing v0.1.20 legacy files containing zero-valued headers, without silently rewriting them.
+- Fail closed when an existing SQLite file reports an unknown application ID, a future user version, or a mixed/mismatched header. The existing `metadata.schema_version=1` and full record-validation checks remain in effect. This is version-aware **compatibility enforcement**, not a schema upgrade or a production cutover.
+- Two additional regression tests cover initialization, offline migration, legacy compatibility, unknown future versions and unrelated application IDs. Full local suite: **68/68 Node tests** passing, including prior JSON/SQLite/security coverage. Default storage remains JSON; no live data migration or deployment.
+
 ## v0.1.20 — November 8, 2026 (canonical backup lock and indexed-write efficiency)
 
 - Hold the same canonical exclusive writer lock used by the running server **throughout** offline SQLite backup creation, verification and publication. This closes the previous check-then-backup race and prevents symlink aliases bypassing the writer check. Failure releases only the backup-owned lock; existing locked/crashed writers remain protected.
