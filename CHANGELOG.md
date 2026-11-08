@@ -1,6 +1,12 @@
 # Changelog
 
-Release maturity: **development preview**. Versions below describe local source snapshots, not stable public releases.
+Release maturity: **development preview**. Versions below describe development milestones, not Stable releases. GitHub commits and CI must be verified independently.
+
+## v0.1.19 — November 8, 2026 (opt-in SQLite runtime/recovery preview)
+
+- Add optional, explicitly selected SQLite storage backend (`GCB_STORAGE_BACKEND=sqlite` with a private `.sqlite`/`.db` path) while leaving the existing JSON backend as the default. SQLite uses the same v1 JSON model, canonical single-writer lock, index-backed tables, transactional `BEGIN IMMEDIATE`/`COMMIT` and rollback, and preserves collection references, ordering and Unicode. `journal_mode=DELETE` and `synchronous=EXTRA` reduce sidecar complexity and strengthen rollback-journal durability in supported filesystems; no cross-host or production readiness is claimed.
+- Add separate **offline-only** SQLite backup/verify/restore CLI with private 0600 files, SHA-256 manifests, SQLite backup API, content integrity checks and no-overwrite destinations. SQLite backup refuses a locked running data file; JSON backup commands remain JSON-only. Backups are unencrypted and require manual retention and verified local recovery.
+- Add 11 new SQLite tests: API restart persistence, schema/permission safeguards, concurrent serialized writes, referential and ordinal updates, rollback after injected SQL error, SIGKILL/abandoned-lock recovery, offline backup integrity/restore, tamper and overwrite refusal, and backup refusal for locked sources. Original JSON tests remain unchanged. No live database migration, browser extension acceptance or production deployment.
 
 ## v0.1.18 — November 8, 2026 (offline SQLite migration development milestone)
 

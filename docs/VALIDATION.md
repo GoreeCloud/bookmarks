@@ -1,6 +1,13 @@
 # GoreeCloud Bookmarks — Validation and Constraints
 
-Local source verification for the v0.1.18 offline SQLite migration development milestone, November 8, 2026.
+Local source verification for the v0.1.19 opt-in SQLite runtime/recovery milestone, November 8, 2026.
+
+## v0.1.19 optional SQLite runtime and offline backup/restore (new)
+
+- Explicit `GCB_STORAGE_BACKEND=sqlite` with a private `.sqlite`/`.db` path chooses a separate new/previously validated database; no JSON library is migrated or replaced without an explicit separate offline command. Existing default JSON-backed API behavior is preserved.
+- Runtime serializes SQLite mutations and updates the schema's ordinal, indexed, tag, payload and metadata tables in one transaction. Invalid records, database-injected write failures, duplicate IDs and bad references fail closed with no partially committed records or cached state divergence. Local app-API restart and SIGKILL recovery were tested on disposable paths; an unclean shutdown leaves the existing fail-closed `.lock` requiring verified manual intervention.
+- Offline SQLite backup uses the built-in SQLite backup API to a private candidate file, verifies the snapshot and SHA-256 pair, and restores only to a new destination. It refuses a locked live writer, altered checksums and overwriting existing targets. No automatic off-site backup, encryption, scheduled rotation, or power-loss certification exists.
+- 11 new tests in `tests/sqlite-store.test.mjs` and `tests/sqlite-backup.test.mjs`; full v0.1.19 Node suite and CI results are recorded separately. The former 52-test v0.1.18 checkpoint remains historical evidence. The only browser acceptance attempted remains `ERR_BLOCKED_BY_ADMINISTRATOR` against the disposable loopback server; issue #2 stays open.
 
 ## v0.1.18 offline SQLite migration (new)
 

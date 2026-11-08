@@ -1,6 +1,6 @@
 # GoreeCloud Bookmarks — Offline SQLite migration preview
 
-**Status:** Development-only and opt-in. The Bookmarks HTTP server still reads and writes its JSON-v1 library. The SQLite tools are not the runtime storage adapter, production migration, or proof of disaster recovery.
+**Status:** Development-only and opt-in. The Bookmarks HTTP server uses JSON-v1 by default. v0.1.19 adds a separate SQLite runtime for **explicit disposable-test opt-in**; the offline converter remains non-mutating toward its JSON source, and no production migration or disaster-recovery certification exists. See [SQLite Runtime](SQLITE_RUNTIME.md).
 
 ## Why and support boundary
 
@@ -34,7 +34,7 @@ Migration stages rows in a private 0600 file on the destination filesystem in a 
 
 ## Rollback and limitations
 
-Rollback during this **offline test** means keep the original JSON source and use the unchanged server configuration; the migration never activates the SQLite file. No automatic deletion, application database switching, schema evolution, WAL runtime coordination, encrypted backup, retention schedule, or automatic restore is included. Sensitive bookmark URLs and notes are **not encrypted at rest** in either the JSON or SQLite file; protect backup copies and filesystem permissions appropriately.
+Rollback during **offline migration** means keep the original JSON source and use the unchanged default server configuration. v0.1.19 allows an explicitly configured SQLite development server reading a separate file, but the migration command never switches the server automatically. No automatic deletion, schema evolution, WAL runtime coordination, encrypted backup, retention schedule, or automatic restore is included. Sensitive bookmark URLs and notes are **not encrypted at rest** in either the JSON or SQLite file; protect backup copies and filesystem permissions appropriately.
 
 The no-overwrite hard-link strategy requires a filesystem supporting hard links to the intended destination. Data durability after unexpected power loss may depend on the filesystem and directory metadata persistence; this is not power-loss certification. Do not attempt unsupported network filesystems or concurrently migrate changing libraries. Do not remove a writer lock automatically. A checksum protects against accidental damage, not an attacker controlling the library and its checksum. The `node:sqlite` API and generated SQLite file must undergo more cross-platform, failure-injection, long-run, multi-writer, backup, and independent-restoration verification before a future database-backed service can be considered for release.
 
