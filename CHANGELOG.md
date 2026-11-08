@@ -2,6 +2,12 @@
 
 Release maturity: **development preview**. Versions below describe development milestones, not Stable releases. GitHub commits and CI must be verified independently.
 
+## v0.1.23 — November 8, 2026 (offline legacy SQLite header transition)
+
+- Add `npm run sqlite-header-mark -- LEGACY.sqlite NEW.sqlite` to copy a fully verified legacy (`application_id=0`, `user_version=0`) SQLite-v1 database to an **independent** file with `GCBM` application identity and `user_version=1`. It uses the SQLite backup API, holds the canonical exclusive writer lock, checks source bytes and contents, syncs the new file, then publishes with no-overwrite semantics.
+- Explicitly refuse locked databases, unknown or already-marked headers, existing destinations and mismatched verified data. Preserve the original file and its original header byte-for-byte for independent rollback. No server configuration is changed.
+- Four new regression tests cover Unicode/record integrity, no-overwrite/legacy-only behavior, lock/alias and foreign-header refusal, and CLI execution. **74/74 local Node tests pass.** This changes only file header markers, **not the table schema**, and does not authorize a live migration, automatic upgrade, encryption, offsite backup or production cutover.
+
 ## v0.1.22 — November 8, 2026 (preflight safety for SQLite startup)
 
 - Existing SQLite database files undergo **read-only integrity, schema, application ID, foreign key and payload verification before any writable SQLite connection or journal-mode configuration**. An unrelated/corrupt database with a `.sqlite` filename is rejected without changes.

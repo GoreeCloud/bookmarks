@@ -1,6 +1,12 @@
 # GoreeCloud Bookmarks — Validation and Constraints
 
-Local source verification for the v0.1.22 SQLite startup preflight milestone, November 8, 2026. Earlier verification records remain below.
+Local source verification for the v0.1.23 offline SQLite header-transition milestone, November 8, 2026. Earlier verification records remain below.
+
+## v0.1.23 Offline legacy header transition
+
+- `npm run check` and **74/74 local Node tests** passed on Node 22.16.0. Four new tests cover complete Unicode/records/permissions preservation, exact old-file bytes, target overwrite refusal, marked/unknown-header rejection, held source lock through symlink alias, and standalone CLI execution.
+- The source file remains unchanged; the only new SQLite file carries `GCBM` application ID and v1 file-version header. A new destination is mandatory; the running server backend is not switched.
+- These tests do **not** certify table-schema migration, power-loss resilience, encrypted or remote backup, production credential management, or real Chrome extension acceptance. GitHub merge/CI must be independently verified.
 
 ## v0.1.22 SQLite preflight and failure cleanup
 

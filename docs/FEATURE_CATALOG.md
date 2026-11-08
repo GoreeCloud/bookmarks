@@ -2,7 +2,7 @@
 
 **Status:** Product requirements / implementation scope. A checked capability below means a development-preview feature was implemented and tested to the extent described in VALIDATION.md; unchecked capabilities are plans and are **not** currently available.
 
-## Current implementation — v0.1.22
+## Current implementation — v0.1.23
 
 - [x] Save, edit and open web bookmarks (HTTP/HTTPS only)
 - [x] Titles, descriptions and personal notes
@@ -26,6 +26,7 @@
 - [x] Private canonical-path single-writer guard for JSON data, with fail-closed crash lock and verified graceful release (not distributed multi-instance support)
 - [x] Validated, non-overwriting local restoration into a new file (`npm run restore-backup`); restored-library startup and authenticated HTTP reads tested (not disaster-recovery certification)
 - [x] Experimental Chromium MV3 extension for active-tab capture, tags, and collection selection, localhost-only (not device-validated)
+- [x] Explicit offline **legacy SQLite header** copy into a new, verified file with `GCBM` identity/version 1. Original legacy database is preserved byte-for-byte; source writer lock is held, no existing destination is overwritten. Not an automatic table-schema upgrade.
 - [x] Opt-in SQLite development storage adapter with atomic transactions, verified rollback, local restart, and separate offline, checksum-backed SQLite backup/restore (JSON remains default; no production migration)
 - [x] Automated Node.js API, schema validation, storage, backup and recovery tests
 
