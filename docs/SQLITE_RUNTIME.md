@@ -1,6 +1,6 @@
 # GoreeCloud Bookmarks — Opt-in SQLite runtime and offline recovery
 
-**Version:** v0.1.22 development preview, November 8, 2026. **Not** a production migration, deployment, default storage switch, encrypted vault, or Stable release. Node 22's built-in `node:sqlite` API remains experimental; Node 24 is tested by CI.
+**Version:** v0.1.23 development preview, November 8, 2026. **Not** a production migration, deployment, default storage switch, encrypted vault, or Stable release. Node 22's built-in `node:sqlite` API remains experimental; Node 24 is tested by CI.
 
 ## Safe use with a disposable library
 
@@ -25,6 +25,10 @@ npm run sqlite-migrate -- inspect ./new-test-library.sqlite
 ```
 
 Before any eventual real-library cutover, stop the JSON writer, verify its snapshot and backup, perform an independent migration against an approved copy, and test both recovery directions. This document does not authorize migration or deletion of real data.
+
+## v0.1.23 Offline legacy header transition
+
+Legacy SQLite files with header pair `(0,0)` remain readable without alteration. The new `npm run sqlite-header-mark -- LEGACY.sqlite NEW.sqlite` command creates a separate marked copy (`GCBM`, version 1) after full verification and under the canonical source lock. It preserves the source byte-for-byte, checks record equality and refuses existing targets; use only with stopped writers and disposable/verified snapshots. See [SQLite Header Transition](SQLITE_HEADER_MARK.md). This is *not* an automatic table-schema upgrade or live data migration.
 
 ## v0.1.22 SQLite startup preflight
 

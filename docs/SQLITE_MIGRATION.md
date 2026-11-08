@@ -26,6 +26,19 @@ npm run sqlite-migrate -- export /path/to/NEW-library.sqlite /path/to/NEW-export
 
 Review the count, IDs, collection associations, text, tags and timestamps before considering any cutover. Run the normal JSON server only with the verified JSON output on a **separate, disposable port and data file** for an independent read-only application-level check. The existing production or personal library remains untouched.
 
+## Explicit offline header transition for legacy SQLite files
+
+Older v0.1.18–v0.1.20 SQLite files use `(application_id=0, user_version=0)` and are still readable by the opt-in runtime without automatic mutation. To create a **new, explicitly marked** file from an independently verified legacy SQLite snapshot, use:
+
+```bash
+# Stop all writers; verify the original and backup first.
+npm run sqlite-migrate -- inspect /private/old.sqlite
+npm run sqlite-header-mark -- /private/old.sqlite /private/new-v1-marked.sqlite
+npm run sqlite-migrate -- inspect /private/new-v1-marked.sqlite
+```
+
+This tool accepts only the legacy header pair and validated Bookmarks-v1 schema, holds the source canonical exclusive writer lock, uses Node's SQLite backup API, checks complete record equality and unchanged source SHA-256/inode, syncs the new candidate, and publishes only to a nonexisting destination. It never changes the old database and creates no implicit service cutover. An existing locked writer, invalid/mixed header, corrupt data, or preexisting destination fails closed. This is a **file-header transition**, *not* a table-schema migration, rollback of schema changes, or approved production migration. See [Header Transition](SQLITE_HEADER_MARK.md).
+
 ## SQLite schema and integrity checks
 
 New files created by the v0.1.21 tools carry application ID `0x4743424d` (`GCBM`) and `PRAGMA user_version=1`, in addition to the metadata `schema_version=1`. Earlier v0.1.20 databases with both header values at zero remain compatible and are not silently modified. Unknown or inconsistent header values fail closed; there is **no automatic schema upgrade**.
