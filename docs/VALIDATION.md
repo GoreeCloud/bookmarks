@@ -1,6 +1,13 @@
 # GoreeCloud Bookmarks — Validation and Constraints
 
-Local source verification for the v0.1.19 opt-in SQLite runtime/recovery milestone, November 8, 2026.
+Local source verification for the v0.1.20 SQLite lock and write-efficiency milestone, November 8, 2026.
+
+## v0.1.20 offline backup canonical lock and unchanged-row efficiency
+
+- Offline SQLite backups now acquire and hold the existing canonical exclusive server writer lock through source validation, snapshot copy, checksum verification, publication and cleanup. A symlink-alias backup cannot bypass an active writer; destination errors release the backup-owned lock. Existing and abandoned locks are not automatically stolen or deleted.
+- SQLite edits with unchanged bookmark/collection ID order now update only modified rows. Reorders/inserts/deletions still relocate unique ordinals atomically; simulated SQL trigger failure during reorder causes a complete rollback. No changes to JSON default behavior or the published SQLite v1 schema.
+- **66/66 local Node tests** and `npm run check` passed, including two new offline-backup tests and one unchanged-row/rollback test. A synthetic 10,000-record profile on this development host measured about 215 ms insert, 74 ms single edit and 177 ms reopen after the change, versus ~295 / ~280 / ~262 ms on a prior single run. These are uncontrolled single-run observations, not release performance SLAs or target-hardware acceptance.
+- Live extension acceptance, real power-loss recovery, production database migration, encryption, backup retention and off-site copies remain open.
 
 ## v0.1.19 optional SQLite runtime and offline backup/restore (new)
 

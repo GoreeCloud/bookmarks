@@ -1,11 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, writeFile, access, stat, open, unlink } from 'node:fs/promises';
+import { mkdtemp, readFile, writeFile, access, stat, open, unlink, symlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { openSqliteStore } from '../src/sqlite-store.mjs';
 import { backupSqlite, verifySqliteBackup, restoreSqliteBackup } from '../src/sqlite-backup.mjs';
 import { inspectSqlite } from '../src/sqlite-migrate.mjs';
+import { acquireSingleWriterLock } from '../src/lock.mjs';
 const date='2026-11-08T10:00:00.000Z';
 const record={id:'b1',url:'https://example.org/backup',title:'保存 💾',description:'',notes:'é',tags:['t'],
   status:'unread',favorite:false,pinned:false,collectionId:null,trashedAt:null,createdAt:date,updatedAt:date};
@@ -38,7 +39,32 @@ test('SQLite restore refuses overwrites; wrong manifest and tampered backups fai
 });
 test('SQLite backups refuse a locked live writer without changing the database',async()=>{
   const f=await fixture();const lock=await open(f.source+'.lock','wx',0o600);
-  try{await assert.rejects(backupSqlite(f.source,f.folder),/server lock exists/);}
+  try{await assert.rejects(backupSqlite(f.source,f.folder),/locked by another writer/);}
   finally{await lock.close();await unlink(f.source+'.lock');}
   assert.equal((await inspectSqlite(f.source)).data.bookmarks.length,1);
+});
+
+test('backup through a symlink cannot bypass the canonical writer lock', async () => {
+  const f = await fixture();
+  const alias = join(f.root, 'alias.sqlite');
+  await symlink(f.source, alias);
+  const lock = await acquireSingleWriterLock(f.source);
+  try {
+    await assert.rejects(backupSqlite(alias, f.folder), /locked by another writer/);
+    await assert.rejects(access(f.folder), e => e.code === 'ENOENT');
+  } finally { await lock.release(); }
+  const copied = await backupSqlite(alias, f.folder);
+  assert.equal(copied.bookmarks, 1);
+  await assert.rejects(access(f.source + '.lock'), e => e.code === 'ENOENT');
+  assert.equal((await inspectSqlite(f.source)).data.bookmarks.length, 1);
+});
+
+test('a destination error releases the offline backup writer lock', async () => {
+  const f = await fixture();
+  // The source file itself cannot be used as a backup directory.
+  await assert.rejects(backupSqlite(f.source, f.source), e => e.code === 'EEXIST' || e.code === 'ENOTDIR');
+  await assert.rejects(access(f.source + '.lock'), e => e.code === 'ENOENT');
+  const next = await acquireSingleWriterLock(f.source);
+  await next.release();
+  assert.equal((await inspectSqlite(f.source)).data.bookmarks.length, 1);
 });

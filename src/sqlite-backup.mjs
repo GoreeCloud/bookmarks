@@ -4,19 +4,15 @@
  */
 import { backup, DatabaseSync } from 'node:sqlite';
 import { randomUUID, createHash, timingSafeEqual } from 'node:crypto';
-import { mkdir, open, link, unlink, readFile, stat, access } from 'node:fs/promises';
+import { mkdir, open, link, unlink, readFile, stat } from 'node:fs/promises';
 import { dirname, basename, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { inspectSqlite } from './sqlite-migrate.mjs';
 import { validateSqliteTarget } from './sqlite-store.mjs';
+import { acquireSingleWriterLock } from './lock.mjs';
 
 const MAX_BACKUP_BYTES = 256 * 1024 * 1024;
 const digest = b => createHash('sha256').update(b).digest('hex');
-async function assertOffline(source) {
-  try { await access(source + '.lock'); }
-  catch (e) { if (e.code === 'ENOENT') return; throw e; }
-  throw new Error('Refusing offline backup while a server lock exists; verify that all writers are stopped');
-}
 async function candidate(destination, suffix) {
   await mkdir(dirname(destination), {recursive:true,mode:0o700});
   const tmp=join(dirname(destination),`.gcb-${basename(destination)}-${randomUUID()}.${suffix}.tmp`);
@@ -49,42 +45,50 @@ export async function verifySqliteBackup(path) {
   return {...result,size:bytes.length};
 }
 export async function backupSqlite(source, directory) {
-  if(!directory || typeof directory!=='string') throw new Error('A private backup destination folder is required');
-  const file=validateSqliteTarget(source);
-  await assertOffline(file);
-  const info=await stat(file);
-  if(!info.isFile() || (info.mode & 0o077))throw new Error('SQLite source must be a private regular file');
-  const folder=resolve(directory);
-  const name='bookmarks-'+new Date().toISOString().replace(/[:.]/g,'-')+'-'+randomUUID().slice(0,8)+'.sqlite';
-  const target=join(folder,name),manifest=target+'.sha256';
-  const temp=await candidate(target,'sqlite');
-  let sourceDb,linked=false,manifestCreated=false;
+  if (!directory || typeof directory !== 'string') throw new Error('A private backup destination folder is required');
+  const requestedFile = validateSqliteTarget(source);
+  // The server uses the *canonical* data path for its exclusive sidecar lock.
+  // Hold the same lock until verification/publishing finishes, rather than just
+  // checking for its presence once (a TOCTOU gap), and reject symlink aliases.
+  const lock = await acquireSingleWriterLock(requestedFile);
   try {
-    const before=await inspectSqlite(file);
-    sourceDb=new DatabaseSync(file,{readOnly:true});
-    await backup(sourceDb,temp);
-    sourceDb.close();sourceDb=null;
-    await syncFile(temp);
-    const after=await inspectSqlite(temp);
-    if(JSON.stringify(after.data)!==JSON.stringify(before.data)){
-      throw new Error('Source changed during backup; restart from an offline snapshot');
+    const file = lock.dataFile;
+    const info = await stat(file);
+    if (!info.isFile() || info.mode & 0o077) throw new Error('SQLite source must be a private regular file');
+    const folder = resolve(directory);
+    const name = 'bookmarks-' + new Date().toISOString().replace(/[:.]/g, '-') + '-' + randomUUID().slice(0, 8) + '.sqlite';
+    const target = join(folder, name), manifest = target + '.sha256';
+    const temp = await candidate(target, 'sqlite');
+    let sourceDb, linked = false, manifestCreated = false;
+    try {
+      const before = await inspectSqlite(file);
+      sourceDb = new DatabaseSync(file, {readOnly:true});
+      await backup(sourceDb, temp);
+      sourceDb.close(); sourceDb = null;
+      await syncFile(temp);
+      const after = await inspectSqlite(temp);
+      if (JSON.stringify(after.data) !== JSON.stringify(before.data)) {
+        throw new Error('Source changed during backup; restart from an offline snapshot');
+      }
+      const bytes = await readFile(temp);
+      if (bytes.length > MAX_BACKUP_BYTES) throw new Error('SQLite backup exceeds 256 MiB');
+      const sha256 = digest(bytes);
+      const m = await open(manifest, 'wx', 0o600); manifestCreated = true;
+      try { await m.writeFile(sha256 + '\n'); await m.sync(); } finally { await m.close(); }
+      await link(temp, target); linked = true;
+      return await verifySqliteBackup(target);
+    } catch (e) {
+      if (linked) await unlink(target).catch(() => {});
+      if (manifestCreated) await unlink(manifest).catch(() => {});
+      throw e;
+    } finally {
+      if (sourceDb) try { sourceDb.close(); } catch {}
+      await unlink(temp).catch(() => {});
     }
-    const bytes=await readFile(temp);
-    if(bytes.length>MAX_BACKUP_BYTES)throw new Error('SQLite backup exceeds 256 MiB');
-    const sha256=digest(bytes);
-    // Publish both private files without overwriting an existing path.
-    const m=await open(manifest,'wx',0o600);manifestCreated=true;
-    try{await m.writeFile(sha256+'\n');await m.sync();}finally{await m.close();}
-    await link(temp,target);linked=true;
-    const result=await verifySqliteBackup(target);
-    return result;
-  }catch(e){
-    if(linked)await unlink(target).catch(()=>{});
-    if(manifestCreated)await unlink(manifest).catch(()=>{});
-    throw e;
-  }finally{
-    if(sourceDb)try{sourceDb.close();}catch{}
-    await unlink(temp).catch(()=>{});
+  } finally {
+    // Even a validation, SQLite or destination error releases only our lock.
+    // The lock implementation refuses to remove a replaced owner's inode.
+    await lock.release();
   }
 }
 export async function restoreSqliteBackup(source,destination){

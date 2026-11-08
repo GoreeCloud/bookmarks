@@ -56,26 +56,41 @@ function upsertRows(db, before, after) {
   const upsertMeta = db.prepare(`INSERT INTO metadata(key,value) VALUES(?,?)
     ON CONFLICT(key) DO UPDATE SET value=excluded.value`);
   const oldBookmarks = new Map(before.bookmarks.map(b => [b.id, JSON.stringify(b)]));
+  const oldCollections = new Map(before.collections.map(c => [c.id, JSON.stringify(c)]));
+  const retainedBookmarkOrder = before.bookmarks.length === after.bookmarks.length &&
+    before.bookmarks.every((b, i) => b.id === after.bookmarks[i].id);
+  const retainedCollectionOrder = before.collections.length === after.collections.length &&
+    before.collections.every((c, i) => c.id === after.collections[i].id);
   const keptBookmarks = new Set(after.bookmarks.map(b => b.id));
   const keptCollections = new Set(after.collections.map(c => c.id));
 
-  // Ordinal has a UNIQUE constraint in the already published v1 migration schema.
-  // Relocate every existing ordinal into a disjoint positive range first to avoid
-  // transient collisions from a bookmark unshift or a collection removal.
-  for (const [table, count] of [['collections', after.collections.length], ['bookmarks', after.bookmarks.length]]) {
+  // The published v1 schema has UNIQUE ordinals. On an insert/delete/reorder,
+  // first relocate old ordinals into a disjoint range to avoid transient collisions.
+  // For ordinary metadata edits, skip both the O(n) reindex and unchanged row
+  // upserts; the single transaction still protects all touched rows and counts.
+  for (const [table, count, orderUnchanged] of [
+    ['collections', after.collections.length, retainedCollectionOrder],
+    ['bookmarks', after.bookmarks.length, retainedBookmarkOrder]]) {
+    if (orderUnchanged) continue;
     const maximum = db.prepare(`SELECT COALESCE(MAX(ordinal), -1) AS n FROM ${table}`).get().n;
     const offset = Number(maximum) + count + 2;
     if (!Number.isSafeInteger(offset)) throw new Error('SQLite ordinal range exhausted');
     db.exec(`UPDATE ${table} SET ordinal=ordinal+${offset}`);
   }
   for (const [i, c] of after.collections.entries()) {
-    collections.run(c.id, c.name, c.createdAt, i, JSON.stringify(c));
+    const serialized = JSON.stringify(c);
+    if (!retainedCollectionOrder || oldCollections.get(c.id) !== serialized) {
+      collections.run(c.id, c.name, c.createdAt, i, serialized);
+    }
   }
   for (const [i, b] of after.bookmarks.entries()) {
     const serialized = JSON.stringify(b);
-    bookmarks.run(b.id,b.url,b.title,b.description,b.notes,b.status,Number(b.favorite),
-      Number(b.pinned),b.trashedAt,b.collectionId,b.createdAt,b.updatedAt,i,serialized);
-    if (oldBookmarks.get(b.id) !== serialized) {
+    const changed = oldBookmarks.get(b.id) !== serialized;
+    if (!retainedBookmarkOrder || changed) {
+      bookmarks.run(b.id,b.url,b.title,b.description,b.notes,b.status,Number(b.favorite),
+        Number(b.pinned),b.trashedAt,b.collectionId,b.createdAt,b.updatedAt,i,serialized);
+    }
+    if (changed) {
       deleteTag.run(b.id);
       b.tags.forEach((tag, ordinal) => insertTag.run(b.id,ordinal,tag));
     }

@@ -2,9 +2,9 @@
 
 **Your private library of the internet.** Save it. Organize it. Preserve it. Find it. Own it.
 
-GoreeCloud Bookmarks is a privacy-first, self-hosted bookmark and read-it-later application. This repository is an **early development preview (v0.1.19)**, implementing a working first slice of the larger [feature specification](docs/FEATURE_CATALOG.md). It is not yet a complete Linkwarden/Karakeep/Raindrop.io replacement or a production-ready public service.
+GoreeCloud Bookmarks is a privacy-first, self-hosted bookmark and read-it-later application. This repository is an **early development preview (v0.1.20)**, implementing a working first slice of the larger [feature specification](docs/FEATURE_CATALOG.md). It is not yet a complete Linkwarden/Karakeep/Raindrop.io replacement or a production-ready public service.
 
-## What works in v0.1.19
+## What works in v0.1.20
 
 - **Bookmark library:** Save, edit, search and open HTTP(S) URLs; titles, descriptions, notes, tags, favorites, pinned items, timestamps and read-later status.
 - **Collections:** Create, rename, browse and delete collections; deleting a collection preserves its bookmarks in the unfiled inbox.
@@ -16,8 +16,8 @@ GoreeCloud Bookmarks is a privacy-first, self-hosted bookmark and read-it-later 
 - **Search and presentation:** Local metadata/tag/notes search, clickable tag filters, sorting, responsive grid/list views and light/dark appearance. The REST API also supports bounded, filterable bookmark searches (`GET /api/bookmarks`) for integrations.
 - **Self-hosted backend:** Built-in HTTP server, 24+ character operator bearer-token bootstrap and time-limited revocable sessions, file-backed persistent store with fsync-before-atomic-replacement, a small REST API, bounded HTTP request/header timeouts, a strict Host-header allowlist and fail-closed loopback-only bind policy (separate explicit non-loopback opt-in), and basic HTTP security headers, bounded failed-authentication throttling, shared stored-library validation, and no outbound crawling.
 - **GoreeCloud UI references:** First-party semantic color, shape and spacing values drawn from the current [GC UI design authority](https://github.com/GoreeCloud/gc-ui). No predecessor design system source or third-party visual assets.
-- **Opt-in SQLite development backend:** A new SQLite runtime adapter, transaction rollback, local restart recovery and separate offline SQLite backup/restore are available for **disposable testing only**. JSON remains the default; no real library is migrated automatically. See [SQLite Runtime](docs/SQLITE_RUNTIME.md).
-- **Zero runtime npm dependencies.** Node.js built-ins only.
+- **Opt-in SQLite development backend:** A transactional SQLite runtime adapter, local restart recovery and separate offline SQLite backup/restore with a canonical held backup writer lock and a benchmarked unchanged-order edit fast path are available for **disposable testing only**. JSON remains the default; no real library is migrated automatically. See [SQLite Runtime](docs/SQLITE_RUNTIME.md).
+- **Zero runtime npm dependencies.** Node.js built-ins only. A disposable 10,000-record benchmark is available as `npm run sqlite-profile -- 10000` (not a performance guarantee).
 
 ## Start locally
 
