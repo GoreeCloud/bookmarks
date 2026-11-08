@@ -2,6 +2,13 @@
 
 Release maturity: **development preview**. Versions below describe development milestones, not Stable releases. GitHub commits and CI must be verified independently.
 
+## v0.1.20 — November 8, 2026 (canonical backup lock and indexed-write efficiency)
+
+- Hold the same canonical exclusive writer lock used by the running server **throughout** offline SQLite backup creation, verification and publication. This closes the previous check-then-backup race and prevents symlink aliases bypassing the writer check. Failure releases only the backup-owned lock; existing locked/crashed writers remain protected.
+- Avoid unnecessary SQLite ordinal relocation and unchanged-row upserts for ordinary bookmark metadata/collection edits when collection and bookmark ID order remains unchanged. Reorders, inserts and deletions still use the established unique-ordinal relocation and one transactional commit/rollback. Add trigger-based regression proving unrelated rows are not rewritten, and failed reorders leave both cache and disk unchanged.
+- Add an **optional disposable synthetic** SQLite benchmark (`npm run sqlite-profile -- 10000`) to measure fresh insertion, single-record edit, snapshot and reopen without reading user data. This development host's first 10,000-record observations were approximately 295 ms insert, 280 ms single edit and 262 ms reopen before the change; the optimized run measured ~215 ms, ~74 ms and ~177 ms respectively. These are single local samples, not latency SLAs or independent device acceptance.
+- Full automated suite: **66/66 Node tests passed** locally after these changes. Prior v0.1.19 63-test checkpoint and post-merge CI are historical evidence, not CI results for v0.1.20. The server still defaults to JSON. No live database migration, real-browser extension acceptance, encryption, or production deployment was performed.
+
 ## v0.1.19 — November 8, 2026 (opt-in SQLite runtime/recovery preview)
 
 - Add optional, explicitly selected SQLite storage backend (`GCB_STORAGE_BACKEND=sqlite` with a private `.sqlite`/`.db` path) while leaving the existing JSON backend as the default. SQLite uses the same v1 JSON model, canonical single-writer lock, index-backed tables, transactional `BEGIN IMMEDIATE`/`COMMIT` and rollback, and preserves collection references, ordering and Unicode. `journal_mode=DELETE` and `synchronous=EXTRA` reduce sidecar complexity and strengthen rollback-journal durability in supported filesystems; no cross-host or production readiness is claimed.

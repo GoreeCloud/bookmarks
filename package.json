@@ -1,6 +1,6 @@
 {
   "name": "@goreecloud/bookmarks",
-  "version": "0.1.19",
+  "version": "0.1.20",
   "private": true,
   "type": "module",
   "license": "MIT",
@@ -17,6 +17,7 @@
     "restore-backup": "node src/backup.mjs restore",
     "sqlite-migrate": "node src/sqlite-migrate.mjs",
     "sqlite-backup": "node src/sqlite-backup.mjs",
-    "browser-session-smoke": "python tests/browser-session-smoke.py"
+    "browser-session-smoke": "python tests/browser-session-smoke.py",
+    "sqlite-profile": "node scripts/profile-sqlite.mjs"
   }
 }

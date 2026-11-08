@@ -4,7 +4,7 @@ import { basename, dirname, join, resolve } from 'node:path';
 
 /**
  * Prevent independently launched GoreeCloud Bookmarks servers from modifying the
- * same JSON library. An exclusive sidecar file is kept for the whole server life.
+ * same JSON or SQLite library. An exclusive sidecar file is kept for the whole server life.
  *
  * A crash may leave the lock in place. Deliberately do not auto-steal "stale"
  * locks: PID reuse and an unavailable process table make that unsafe. Recovery

@@ -1,6 +1,6 @@
 # GoreeCloud Bookmarks — Opt-in SQLite runtime and offline recovery
 
-**Version:** v0.1.19 development preview, November 8, 2026. **Not** a production migration, deployment, default storage switch, encrypted vault, or Stable release. Node 22's built-in `node:sqlite` API remains experimental; Node 24 is tested by CI.
+**Version:** v0.1.20 development preview, November 8, 2026. **Not** a production migration, deployment, default storage switch, encrypted vault, or Stable release. Node 22's built-in `node:sqlite` API remains experimental; Node 24 is tested by CI.
 
 ## Safe use with a disposable library
 
@@ -28,15 +28,15 @@ Before any eventual real-library cutover, stop the JSON writer, verify its snaps
 
 ## Runtime semantics and consistency
 
-The adapter preserves the v1 JSON record model (`schema`, `bookmarks`, `collections`), the public HTTP request/response contracts and the in-process `snapshot()/mutate()` interface. It uses the same published SQLite v1 tables (`metadata`, `collections`, `bookmarks`, `tags`) and validates referenced IDs, dates, URLs, statuses and record order. Writes use an explicit SQLite `BEGIN IMMEDIATE` / `COMMIT` transaction, with `ROLLBACK` after failures. Changes to foreign keys, indexes, payloads, tag rows, order and count metadata are applied together. A failed write leaves both the cached snapshot and on-disk records unchanged; later valid writes remain possible.
+The v0.1.20 adapter skips unchanged-row upserts and ordinal relocation when IDs and ordering remain identical. Inserts, deletions and reorder operations still use the published v1 unique-ordinal relocation transaction. The adapter preserves the v1 JSON record model (`schema`, `bookmarks`, `collections`), the public HTTP request/response contracts and the in-process `snapshot()/mutate()` interface. It uses the same published SQLite v1 tables (`metadata`, `collections`, `bookmarks`, `tags`) and validates referenced IDs, dates, URLs, statuses and record order. Writes use an explicit SQLite `BEGIN IMMEDIATE` / `COMMIT` transaction, with `ROLLBACK` after failures. Changes to foreign keys, indexes, payloads, tag rows, order and count metadata are applied together. A failed write leaves both the cached snapshot and on-disk records unchanged; later valid writes remain possible.
 
 The selected local journal policy is **`journal_mode=DELETE` with `synchronous=EXTRA`**, with foreign keys on and an existing 2-second SQLite busy timeout. This deliberately avoids WAL checkpoint and sidecar backup complexity for the development single-writer service; SQLite's official documentation describes EXTRA as adding directory sync after deletion of the rollback journal. This is not independently certified against power failure on all filesystems. Cooperative servers still use the canonical-path `.lock` file. A crash leaves that lock for verified manual recovery; the SQLite transaction itself remains crash-consistent under its documented assumptions. No distributed multi-writer coordination is provided.
 
-Current `snapshot()` reads a validated in-memory cache, and serialized mutations update indexed SQLite tables. Reordering rows updates all positional ordinals, and request validation still scans the library in memory. Performance at large collection sizes has not been profiled or accepted. Do **not** expose the development server beyond a reviewed loopback/test boundary.
+Current `snapshot()` reads a validated in-memory cache, and serialized mutations update indexed SQLite tables. Reordering rows updates all positional ordinals, and request validation still scans the library in memory. A **single** disposable synthetic 10,000-record profile (`npm run sqlite-profile -- 10000`) measured approximately 215 ms initial insert, 74 ms single edit and 177 ms reopen on the local development runtime after the v0.1.20 unchanged-order update optimization; before it, the same host measured roughly 295 ms, 280 ms and 262 ms. These measurements have no stable CI threshold and are **not** acceptance on a target device or a comprehensive load test. Do **not** expose the development server beyond a reviewed loopback/test boundary.
 
 ## Private, offline SQLite backups
 
-**The JSON `npm run backup` and `npm run restore-backup` commands remain JSON-only.** The SQLite commands below are separate and do not read or write the JSON library. Stop the SQLite server before calling them; the SQLite backup command refuses the source when its `.lock` exists, even if the process crashed, until an administrator verifies it is abandoned.
+**The JSON `npm run backup` and `npm run restore-backup` commands remain JSON-only.** The SQLite commands below are separate and do not read or write the JSON library. Stop the SQLite server before calling them; the v0.1.20 SQLite backup holds the same exclusive **canonical-path** sidecar lock as the server for the entire snapshot/verification/publish operation, preventing another cooperative writer from starting between checking and copying. Symlink aliases resolve to the same lock. A previously existing `.lock` still blocks backup, including after a crash, until the administrator verifies it is abandoned.
 
 ```bash
 npm run sqlite-backup -- backup ./new-test-library.sqlite ./private-backups

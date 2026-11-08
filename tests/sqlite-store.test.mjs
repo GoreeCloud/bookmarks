@@ -180,3 +180,23 @@ test('SQLite unclean shutdown retains committed record and fail-closed lock, sup
   }finally{if(live)await stop(live.cp,'SIGTERM').catch(()=>live.cp.kill('SIGKILL'));}
   await assert.rejects(access(f.db+'.lock'),e=>e.code==='ENOENT');
 });
+
+test('single-record updates leave unrelated SQLite rows untouched and reorders still transact', async () => {
+  const f = await sandbox();
+  const store = await openSqliteStore(f.db);
+  try {
+    await store.mutate(s => { s.collections.push(c()); s.bookmarks.push(b('b1'), b('b2')); });
+    const injection = new DatabaseSync(f.db);
+    try {
+      injection.exec(`CREATE TRIGGER fail_unrelated BEFORE UPDATE ON bookmarks
+        WHEN OLD.id = 'b2' BEGIN SELECT RAISE(ABORT, 'unrelated row must not be rewritten'); END;`);
+    } finally { injection.close(); }
+    await store.mutate(s => { s.bookmarks[0].notes = 'one-row edit'; });
+    const persisted = store.snapshot();
+    assert.equal(persisted.bookmarks[0].notes, 'one-row edit');
+    assert.equal(persisted.bookmarks[1].notes, '💾 notes');
+    await assert.rejects(store.mutate(s => { s.bookmarks.reverse(); }), /unrelated row must not be rewritten/);
+    assert.deepEqual(store.snapshot(), persisted, 'failed reorder must not change cached data');
+    assert.deepEqual((await inspectSqlite(f.db)).data, persisted, 'failed reorder must roll back on disk');
+  } finally { await store.close(); }
+});
